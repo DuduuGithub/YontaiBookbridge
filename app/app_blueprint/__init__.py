@@ -16,3 +16,6 @@ def register_blueprints(app):
                 blueprint = getattr(module, attr)
                 if isinstance(blueprint, Blueprint):
                     app.register_blueprint(blueprint)
+
+
+print(1)
