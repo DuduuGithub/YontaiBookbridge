@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>动态人际关系网</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.24.0/cytoscape.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      position: fixed;
+    }
+    #network {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #form {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <div id="form">
+    <form id="formSelect">
+      <label for="folders">选择收藏夹:</label>
+      <select id="folders" name="folders" multiple>
+        <!-- 动态加载收藏夹 -->
+      </select>
+      <button type="submit">生成关系网</button>
+    </form>
+  </div>
+  <div id="network"></div>
+
+  <script>
+    $(document).ready(function() {
+      // 动态加载收藏夹列表
+      $.ajax({
+        url: '/get_all_folders',  // 向后端请求收藏夹数据
+        type: 'GET',
+        success: (response) => {
+          // 动态加载返回的收藏夹列表
+          response.folders.forEach(folder => {
+            $('#folders').append(new Option(folder, folder));
+          });
+        },
+        error: () => {
+          alert('无法加载收藏夹列表');
+        }
+      });
+
+      $('#formSelect').on('submit', function(e) {
+        e.preventDefault();
+        const selectedFolders = $('#folders').val();
+
+        // 将选中的收藏夹数据发送到后端
+        $.ajax({
+          url: '/generate_graph',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ folders: selectedFolders }),
+          success: (response) => {
+            if (response.success) {
+              renderGraph(response.data);
+            } else {
+              alert('数据格式错误！');
+            }
+          },
+          error: () => {
+            alert('网络请求失败！');
+          },
+        });
+      });
+    });
+
+    // 渲染人际关系网
+    const renderGraph = (data) => {
+      const cy = cytoscape({
+        container: document.getElementById('network'),
+        elements: {
+          nodes: data.nodes.map(node => ({ data: node })),
+          edges: data.edges.map(edge => ({ data: edge })),
+        },
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'background-color': '#0074D9',
+              'label': 'data(label)',
+              'text-valign': 'center',
+              'color': '#fff',
+            },
+          },
+          {
+            selector: 'edge',
+            style: {
+              'width': 2,
+              'line-color': '#ccc',
+              'target-arrow-color': '#ccc',
+              'target-arrow-shape': 'triangle',
+              'label': 'data(label)',
+            },
+          },
+        ],
+        layout: {
+          name: 'cose',
+          animate: false,
+          refresh: 1,
+          componentSpacing: 100,
+          nodeRepulsion: 400000,
+          nodeOverlap: 20,
+          gravity: 80,
+          randomize: false
+        },
+      });
+    };
+  </script>
+</body>
+</html>

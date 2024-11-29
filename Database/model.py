@@ -15,3 +15,38 @@
 # 用户文书表：uid,编号,标记、笔记等
 
 # 日志表 记录对文书数据表的更改日志
+from Database.config import db
+
+class Documents:
+    pass
+
+class Participants:
+    pass
+
+
+class Users:
+    pass
+
+class Highlights:
+    pass
+
+class Notes:
+    pass
+
+class Folders:
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    pass
+
+class AuditLog:
+    pass
+
+class Corrections:
+    pass
+
+class Comments:
+    pass
+
+class History:
+    pass

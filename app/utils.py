@@ -1,16 +1,76 @@
-# 自定义的使用数据库的功能
-from config import db
+# 连接数据库的基本功能
+import sys
+import os
 
-def db_add(object):
+# 将项目根目录添加到 sys.path,Python默认从当前文件所在的目录开始找，也就是app文件夹开始找
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from Database.config import db
+
+#在数据库中加一条记录
+def db_add(model,**kwargs):
     try:
-        db.session.add(object)
+        record = model(**kwargs)
+        db.session.add(record)
         db.session.commit()
-    except Exception as e:
+    except Exception :
         db.session.rollback()
         print("db_add wrong")
         raise
 
+#在数据库中以主键删除一条记录：(主键可能有两个)
+def db_delete_key(model,key):
+    record=model.query.get(key)
+    if record:
+        db.session.delete(record)  # 删除记录
+        db.session.commit()  # 提交事务
+    else:
+        print("db_delete wrong")
 
+
+# 更新,针对单一主键
+def db_update_key(model, key, **update_data):
+    # 通过主键查找记录
+    record = model.query.get(key)
+    
+    if record:
+        # 遍历字典并更新字段
+        for field, value in update_data.items():
+            if hasattr(record, field):  # 确保字段存在于模型中
+                setattr(record, field, value)  # 更新字段的值
+        
+        db.session.commit()  # 提交更新
+        return record  # 返回更新后的记录
+    
+    return None  # 如果记录不存在，返回 None
+
+#针对双主键
+def db_update_keys(model, key1,key2, **update_data):
+    # 通过主键查找记录
+    record = model.query.get((key1,key2))
+
+    if record:
+        # 遍历字典并更新字段
+        for field, value in update_data.items():
+            if hasattr(record, field):  # 确保字段存在于模型中
+                setattr(record, field, value)  # 更新字段的值
+                
+        db.session.commit()  # 提交更新
+        return record  # 返回更新后的记录
+    
+    return None  # 如果记录不存在，返回 None
+
+# 查询所有数据
+def db_query_all(model):
+    return model.query.all()
+
+# 根据单一主键查询数据
+def db_query_key(model, record_id):
+    return model.query.get(record_id)
+
+#双主键
+def db_query_keys(model, key1,key2):
+    return model.query.get((key1,key2))
+    
 import opencc
 from sparkai.llm.llm import ChatSparkLLM, ChunkPrintHandler
 from sparkai.core.messages import ChatMessage

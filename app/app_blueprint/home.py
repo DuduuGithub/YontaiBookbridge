@@ -2,7 +2,7 @@
 
 from flask import Blueprint
 
-home_bp=Blueprint('home',__name__,static_folder='static/home',url_prefix='/home')
+home_bp=Blueprint('home',__name__,template_folder='app/templates/home',static_folder='app/static/home',url_prefix='/home')
 
 # 主页面
 @home_bp.route('/')
