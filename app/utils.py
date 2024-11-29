@@ -2,9 +2,14 @@
 import sys
 import os
 
+from flask import jsonify
+
 # 将项目根目录添加到 sys.path,Python默认从当前文件所在的目录开始找，也就是app文件夹开始找
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Database.config import db
+from Database.model import *
+from app import app
+
 
 #在数据库中加一条记录
 def db_add(model,**kwargs):
@@ -71,6 +76,21 @@ def db_query_key(model, record_id):
 def db_query_keys(model, key1,key2):
     return model.query.get((key1,key2))
     
+
+
+# 返回一个JSON格式的收藏夹列表
+@app.route('/get_all_folders', methods=['GET'])
+def get_folders():
+
+    folders= db_query_all(Folders)
+    return jsonify(folders=folders)
+
+
+# 根据文书编号返回文书记录
+
+
+
+
 import opencc
 from sparkai.llm.llm import ChatSparkLLM, ChunkPrintHandler
 from sparkai.core.messages import ChatMessage
@@ -161,4 +181,3 @@ def db_book_input(hard:str):
         return save_as_dict(responseContent)
     
     # 下面需要补充 生成一个表记录对象 使用db_add来加入
-

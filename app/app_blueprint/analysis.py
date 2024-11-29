@@ -11,22 +11,25 @@ def index():
     return render_template('/index.html')
 
 
+# 本蓝图而来的函数
 # 返回一个JSON格式的收藏夹列表
-@analysis_bp.route('/get_all_folders', methods=['GET'])
-def get_folders():
 
-    folders= db_query_all(Folders)
-    return jsonify(folders=folders)
+
 
 @analysis_bp.route('/generate_graph', methods=['POST'])
 def generate_graph():
     data = request.get_json()
     folders = data.get('folders', [])
-
-    # 根据选择的收藏夹生成图数据
-    # 这里是一个示例，可以根据实际需求进行修改
     nodes = []
     edges = []
+    for folder in folders:
+        document=db_query_key(Documents,folder.docid)   #docid……记得改
+        relation=document.relation
+        nodes.append()      #记得加
+        edges.append()
+    # 根据选择的收藏夹生成图数据
+    # 这里是一个示例，可以根据实际需求进行修改
+    
 
     for i, folder in enumerate(folders):
         nodes.append({'id': str(i+1), 'label': folder})
