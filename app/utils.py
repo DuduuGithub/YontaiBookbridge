@@ -3,12 +3,14 @@ import sys
 import os
 
 from flask import jsonify
-
+from sqlalchemy import text
 # 将项目根目录添加到 sys.path,Python默认从当前文件所在的目录开始找，也就是app文件夹开始找
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Database.config import db
 from Database.model import *
 from app import app
+
+from sqlalchemy import or_
 
 
 #在数据库中加一条记录
@@ -72,10 +74,50 @@ def db_query_all(model):
 def db_query_key(model, record_id):
     return model.query.get(record_id)
 
-#双主键
+#双主键查询
 def db_query_keys(model, key1,key2):
     return model.query.get((key1,key2))
+   
+# 由两个人的id获得两个人的关系
+def get_relation_by_ids(alice_id, bob_id):
+
+    return Relations.query.filter(
+        or_(
+            (Relations.Alice_id == alice_id, Relations.Bob_id == bob_id),
+            (Relations.Alice_id == bob_id, Relations.Bob_id == alice_id)
+        )
+    )
+#通用函数：根据一个字段名和值筛选出所有满足条件的记录
+def db_one_filter_records(model, column_name, value):
+    # 通过 getattr 动态获取模型的列属性
+    column = getattr(model, column_name)
     
+    # 执行查询，筛选出符合条件的记录
+    records = model.query.filter(column == value).all()
+
+    return records
+    
+#全文搜索
+def db_context_query(query):
+    """
+    实现全文检索，查询文书标题或原文中包含关键字的记录。
+    """
+    # 使用原生 SQL 查询，MATCH...AGAINST 用于全文索引检索,同时按照匹配程度降序排序，不是模糊查询
+    sql = text("""
+        SELECT * FROM Documents
+        WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
+        AGAINST(:query IN BOOLEAN MODE)
+        ORDER BY MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) AGAINST(:query) DESC; 
+    """)
+
+    # 执行查询
+    result = db.session.execute(sql, {'query': query})
+    
+    # 获取检索到的文书记录
+    documents = result.fetchall()
+    
+    # 返回检索到的结果，列表形式
+    return documents
 
 
 # 返回一个JSON格式的收藏夹列表
@@ -85,8 +127,6 @@ def get_folders():
     folders= db_query_all(Folders)
     return jsonify(folders=folders)
 
-
-# 根据文书编号返回文书记录
 
 
 

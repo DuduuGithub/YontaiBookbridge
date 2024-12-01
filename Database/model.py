@@ -20,15 +20,14 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, Text, Date, Enum, TIMESTAMP, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from config import db
+from Database.config import db
 
 # 文书类：Documents
 class Documents(db.Model):
     __tablename__ = 'Documents'  # 定义表名为 'Documents'
 
     # 文书的基本字段
-    Doc_id = Column(Integer, primary_key=True, autoincrement=True)  # 文书序号，自增主键
-    Doc_number = Column(String(20),nullable=False)  #归档编号，非空
+    Doc_id = Column(String(20), primary_key=True)  # 文书序号，与书籍中编号一致
     Doc_title = Column(String(255), nullable=False)  # 文书标题，非空
     Doc_originalText = Column(Text, nullable=False)  # 文书的繁体原文，非空
     Doc_simplifiedText = Column(Text, default=None)  # 文书的简体原文，默认为空
@@ -69,19 +68,38 @@ class DocKeywords(db.Model):
     Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  #文书ID
     KeyWord = Column(String(50),nullable=False)  #关键词，非空
 
+# 人物类：Persons
+class Persons(db.Model):
+    __tablename__ = 'Persons' #表名为 'Persons'
 
+    Person_id = Column(Integer,primary_key=True,autoincrement=True)  #人物序号，自增主键
+    Person_name = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  #人物名 同名的处理有机会再做
 
-# 参与者类：Participants
+# 文书参与者类：Participants 参与者只有代写等等人，对于契约人不涉及，相当于将他们当作两种类型
 class Participants(db.Model):
     __tablename__ = 'Participants'  # 表名为 'Participants'
     
-    Part_id = Column(Integer, primary_key=True, autoincrement=True)  # 参与者序号，自增主键
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
-    Part_name = Column(String(255), nullable=False)  # 参与者姓名，非空
+    Person_id = Column(Integer,ForeignKey('People.id'), primary_key=True, nullable=False)  # 主键。参与者序号，外键关联到人员id
+    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), primary_key=True, nullable=False)  # 主键。外键，关联到 'Documents' 表的 Doc_id
     Part_role = Column(String(50), nullable=False)  # 参与者的角色（如签署人、见证人），非空
 
+# 契约人类：Contractors
+class Contractors(db.Model):
+    __tablename__ = 'Contractors' #表名为 'Contractors'
 
+    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), primary_key=True, nullable=False)  # 主键。外键，关联到 'Documents' 表的 Doc_id
+    Alice_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 契约人序号，外键关联到人员id
+    Bob_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 契约人序号，外键关联到人员id
+    
+# 人物关系类：Relations 
+class Relations(db.Model): 
+    __tablename__ = 'Relations' #表名为 'Relations'
 
+    Alice_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 主键。契约人序号，外键关联到人员id
+    Bob_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 主键。契约人序号，外键关联到人员id
+    Relation_type = Column(String(50), nullable=True)  #关系名
+    
+    
 # 用户类：Users
 class Users(db.Model):
     __tablename__ = 'Users'  # 表名为 'Users'

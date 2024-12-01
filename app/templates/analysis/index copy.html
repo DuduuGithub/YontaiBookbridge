@@ -109,8 +109,24 @@
               'target-arrow-color': '#ccc',
               'target-arrow-shape': 'triangle',
               'label': 'data(label)',
+              'arrow-scale': 2          // 增加箭头的大小
             },
           },
+          {
+            selector: 'edge[directed = "true"]', // 如果边有方向
+            style: {
+              'target-arrow-shape': 'triangle', // 显示箭头
+              'target-arrow-color': '#000',     // 箭头颜色
+              'line-color': '#000'              // 边的颜色
+            }
+          },
+          {
+            selector: 'edge[directed = "false"]', // 如果边无方向
+            style: {
+              'target-arrow-shape': 'none',      // 不显示箭头
+              'line-color': '#ccc'               // 边的颜色
+            }
+          }
         ],
         layout: {
           name: 'cose',
