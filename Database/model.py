@@ -20,7 +20,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, Text, Date, Enum, TIMESTAMP, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from Database.config import db
+from config import db
 
 # 文书类：Documents
 class Documents(db.Model):
@@ -79,7 +79,7 @@ class Persons(db.Model):
 class Participants(db.Model):
     __tablename__ = 'Participants'  # 表名为 'Participants'
     
-    Person_id = Column(Integer,ForeignKey('People.id'), primary_key=True, nullable=False)  # 主键。参与者序号，外键关联到人员id
+    Person_id = Column(Integer,ForeignKey('Person.id'), primary_key=True, nullable=False)  # 主键。参与者序号，外键关联到人员id
     Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), primary_key=True, nullable=False)  # 主键。外键，关联到 'Documents' 表的 Doc_id
     Part_role = Column(String(50), nullable=False)  # 参与者的角色（如签署人、见证人），非空
 

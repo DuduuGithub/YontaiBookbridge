@@ -98,26 +98,57 @@ def db_one_filter_records(model, column_name, value):
     return records
     
 #全文搜索
-def db_context_query(query):
+def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     """
-    实现全文检索，查询文书标题或原文中包含关键字的记录。
+    实现全文检索，查询文书标题或原文中包含关键字的记录，并支持高级搜索。
+    
+    :param query: 用于全文检索的关键字
+    :param doc_type: （可选）文档类型，用于筛选特定类型的文档
+    :param date_from: （可选）起始日期，用于筛选创建日期晚于此日期的文档
+    :param date_to: （可选）结束日期，用于筛选创建日期早于此日期的文档
+    :return: 返回符合条件的文档列表
     """
-    # 使用原生 SQL 查询，MATCH...AGAINST 用于全文索引检索,同时按照匹配程度降序排序，不是模糊查询
+    
+    # 基础的全文检索 SQL 查询
     sql = text("""
         SELECT * FROM Documents
         WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
         AGAINST(:query IN BOOLEAN MODE)
-        ORDER BY MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) AGAINST(:query) DESC; 
+    """)
+
+    # 添加文档类型筛选条件（如果提供）
+    if doc_type:
+        sql = sql + text(" AND Doc_type = :doc_type")
+    
+    # 添加日期范围筛选条件（如果提供）
+    if date_from:
+        sql = sql + text(" AND Doc_createdAt >= :date_from")
+    if date_to:
+        sql = sql + text(" AND Doc_createdAt <= :date_to")
+    
+    # 添加排序条件（按匹配程度降序）
+    sql = sql + text("""
+        ORDER BY MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) AGAINST(:query) DESC;
     """)
 
     # 执行查询
-    result = db.session.execute(sql, {'query': query})
+    params = {'query': query}
+    if doc_type:
+        params['doc_type'] = doc_type
+    if date_from:
+        params['date_from'] = date_from
+    if date_to:
+        params['date_to'] = date_to
+    
+    # 执行 SQL 查询
+    result = db.session.execute(sql, params)
     
     # 获取检索到的文书记录
     documents = result.fetchall()
     
     # 返回检索到的结果，列表形式
     return documents
+
 
 
 # 返回一个JSON格式的收藏夹列表

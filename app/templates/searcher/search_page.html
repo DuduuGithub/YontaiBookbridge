@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Page</title>
+</head>
+<body>
+    <h1>Search Documents</h1>
+    <form action="/search" method="POST">
+        <!-- Full-text search input -->
+        <label for="query">Search (Full-Text): </label>
+        <input type="text" id="query" name="query" placeholder="Enter search keyword" required>
+
+        <!-- Advanced filtering options -->
+        <br>
+        <label for="doc_type">Document Type:</label>
+        <select name="doc_type" id="doc_type">
+            <option value="">All</option>
+            <option value="Contract">Contract</option>
+            <option value="Agreement">Agreement</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <br>
+        <label for="date_from">Date From:</label>
+        <input type="date" id="date_from" name="date_from">
+
+        <br>
+        <label for="date_to">Date To:</label>
+        <input type="date" id="date_to" name="date_to">
+
+        <br>
+        <button type="submit">Search</button>
+    </form>
+
+    <h2>Search Results</h2>
+    <ul id="results">
+        <!-- Search results will be dynamically inserted here -->
+    </ul>
+</body>
+</html>
