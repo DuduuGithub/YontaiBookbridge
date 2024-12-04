@@ -96,7 +96,22 @@ def db_one_filter_records(model, column_name, value):
     records = model.query.filter(column == value).all()
 
     return records
+
+def db_query_by_conditions(model, conditions: dict):
+    session = db.session()
+    # 构建基本的查询语句
+    sql = f"SELECT * FROM {model.__tablename__} WHERE 1=1"
+    # 遍历条件字典，添加查询条件
+    for column, value in conditions.items():
+        if value is not None:  # 排除值为 None 的情况
+            sql += f" AND {column} = :{column}"
     
+    # 执行查询
+    results = session.execute(text(sql), conditions).all()
+
+    
+    # 返回查询到的记录列表
+    return results
 #全文搜索
 def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     """

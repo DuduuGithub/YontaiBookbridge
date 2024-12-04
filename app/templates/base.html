@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}文书阅读系统{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <!-- 导航窗格 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">文书阅读系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.blueprint == 'reader' %}active{% endif %}" href="/reader/">
+                            文书阅读
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.blueprint == 'discussion' %}active{% endif %}" href="/discussion/">
+                            讨论区
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.blueprint == 'error_report' %}active{% endif %}" href="/error-report/">
+                            差错提交
+                        </a>
+                    </li>
+                </ul>
+                
+                <!-- 用户相关 -->
+                <ul class="navbar-nav">
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            {{ current_user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/user/profile">个人中心</a></li>
+                            <li><a class="dropdown-item" href="/user/bookmarks">我的收藏</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/auth/logout">退出登录</a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/auth/login">登录</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/auth/register">注册</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bootstrap JS 和其他必要的脚本 -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
