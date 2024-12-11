@@ -8,7 +8,7 @@ from sqlalchemy import text
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Database.config import db
 from Database.model import *
-from app import app
+
 
 from sqlalchemy import or_
 
@@ -166,12 +166,7 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
 
 
 
-# 返回一个JSON格式的收藏夹列表
-@app.route('/get_all_folders', methods=['GET'])
-def get_folders():
 
-    folders= db_query_all(Folders)
-    return jsonify(folders=folders)
 
 
 

@@ -11,18 +11,24 @@
 # 文书数据表：编号，文本内容，契约人，大意……评论区
 # 文书纠错表：用于管理员查看用户提交的文书的纠错内容
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from Database.config import db  # 导入 Database/config.py 中的 db 实例
+
 
 # 用户文书表：uid,编号,标记、笔记等
 
 # 日志表 记录对文书数据表的更改日志
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, String, Text, Date, Enum, TIMESTAMP, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Date, Enum, TIMESTAMP, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from config import db
+from Database.config import db
 
-# 文书类：Documents
+# 1、文书类：Documents
 class Documents(db.Model):
     __tablename__ = 'Documents'  # 定义表名为 'Documents'
 
@@ -33,8 +39,10 @@ class Documents(db.Model):
     Doc_simplifiedText = Column(Text, default=None)  # 文书的简体原文，默认为空
     Doc_type = Column(Enum('借贷', '契约', '其他'), nullable=False)  # 文书类型，可参考第二次小组作业
     Doc_summary = Column(Text, default=None)  # 文书的大意，默认为空
-    Doc_createdAt = Column(String(50),default=None)  # 文书创建时间，默认为空
-    Doc_updatedAt = Column(String(50),default=None)  # 最后修改时间，默认为空
+    Doc_createdData = Column(String(50), default=None)  # 文书创建时间（如"康熙三年"）
+    Doc_updatedData = Column(String(50), default=None)  # 文书修改时间（如"康熙四年"）
+    Doc_createdGregorianDate = Column(DateTime, default=None)  # 文书公历创建时间
+    Doc_updatedGregorianDate = Column(DateTime, default=None)  # 文书公历修改时间
     
     # 关系定义：
     participants = relationship('Participants', backref='document', cascade='all, delete-orphan')  # 与参与者的关系
@@ -43,62 +51,124 @@ class Documents(db.Model):
     comments = relationship('Comments', backref='document', cascade='all, delete-orphan')  # 评论记录
     corrections = relationship('Corrections', backref='document', cascade='all, delete-orphan')  # 纠错记录
     keywords = relationship('DocKeywords', backref='document', cascade='all, delete-orphan')  # 文书关键词
-    
+    standard_creation_time = relationship('StandardCreationTime', backref='document', uselist=False)
+    standard_update_time = relationship('StandardUpdateTime', backref='document', uselist=False)    
     """
     每个文书可以有多个参与者、高亮、批注等。当文书被删除时，所有相关记录都会自动删除，防止孤立数据。
     cascade='all, delete-orphan'：这确保了如果父表(如 Documents)被删除，所有子表中的相关数据也会被删除。
-    此外，如果子对象从父对象的关系中脱离（例如删除了 Participants 记录，且没有重新关联到其他 Documents),它也会被删除。
+    此外，如果子对象从父对象的关系中脱离（例如删除了 Participants 记录，且没有重新联到其他 Documents),它也会被删除。
     backref='document'：这是反向关系。通过 document 可以从子表（如 Participants)访问父表 Documents。
     """
 
     # 定义索引：帮助优化查询
     __table_args__ = (
-        db.Index('idx_Doc_number','Doc_number'), #为'归档编号'建立索引
+        db.Index('idx_Doc_id', 'Doc_id'),  # 为'文书序号'建立索引，使用正确的列名
         db.Index('idx_Doc_type', 'Doc_type'),  # 为'文书类型'创建索引
-        db.Index('idx_Doc_createdAt', 'Doc_createdAt'),  # 为文'书创建时间' 创建索引
+        db.Index('idx_Doc_createdGregorianDate', 'Doc_createdGregorianDate'),  # 为文'书创建日期' 创建索引
+        db.Index('idx_doc_created_data', 'Doc_createdData'),  # 为文'书创建时间' 创建索引
+        db.Index('idx_doc_updated_data', 'Doc_updatedData')  # 添加修改时间的索引
+    )
+
+#标准创建时间表
+class StandardCreationTime(db.Model):
+    __tablename__ = 'StandardCreationTime'
+
+    Time_id = Column(Integer, primary_key=True, autoincrement=True)  # 自增主键
+    createdData = Column(String(50), ForeignKey('Documents.Doc_createdData'), nullable=False)  # 外键，引用 Doc_createdData
+    Standard_createdData = Column(TIMESTAMP, nullable=False)  # 标准化时间（公历时间）
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 Documents 表
+
+    # 外键关联到 Documents 表
+    document = relationship('Documents', backref='standard_creation_time')
+
+    # 在 Standard_creation_time 上建立索引，优化查询
+    __table_args__ = (
+        db.Index('idx_Standard_createdData', 'Standard_createdData'),  # 为标准时间字段添加索引
+        db.Index('idx_Doc_id', 'Doc_id')  # 为 Doc_id 添加索引
+    )
+
+
+#标准修改时间表
+class StandardUpdateTime(db.Model):
+    __tablename__ = 'StandardUpdateTime'
+
+    Time_id = Column(Integer, primary_key=True, autoincrement=True)  # 自增主键
+    updatedData = Column(String(50), ForeignKey('Documents.Doc_updatedData'), nullable=False)  # 外键，引用 Doc_updatedData
+    Standard_updatedData = Column(DateTime, nullable=False)  # 标准化时间（公历时间）
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 Documents 表
+
+    # 外键关联到 Documents 表
+    document = relationship('Documents', backref='standard_update_time')
+
+    # 在 Standard_update_time 上建立索引，优化查询
+    __table_args__ = (
+        db.Index('idx_Standard_updatedData', 'Standard_updatedData'),  # 为标准时间字段添加索引
+        db.Index('idx_Doc_id', 'Doc_id')  # 为 Doc_id 添加索引
     )
 
 
 
-# 文书关键词类：DocKeywords
+# 2、文书关键词类：DocKeywords
 class DocKeywords(db.Model):
     __tablename__ = 'DocKeywords' #表名为 'DocKeywords'
 
     KeyWord_id = Column(Integer,primary_key=True,autoincrement=True)  #关键词序号，自增主键
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  #文书ID
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False) #文书ID
     KeyWord = Column(String(50),nullable=False)  #关键词，非空
 
-# 人物类：Persons
-class Persons(db.Model):
-    __tablename__ = 'Persons' #表名为 'Persons'
 
-    Person_id = Column(Integer,primary_key=True,autoincrement=True)  #人物序号，自增主键
-    Person_name = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  #人物名 同名的处理有机会再做
+# 人物类：People
+class People(db.Model):
+    __tablename__ = 'People'  # 表名为 'People'
+
+    Person_id = Column(Integer, primary_key=True, autoincrement=True)  # 人物序号，自增主键
+    Person_name = Column(String(100), nullable=False)  # 人物名称
+
+    # 如果需要，可以在这里添加更多字段来描述人物其他信息
+
+    # 关系：一个人物可以参与多个关系记录（在 Relations 表中）
+    relations_as_alice = relationship('Relations', foreign_keys='Relations.Alice_id', backref='alice')
+    relations_as_bob = relationship('Relations', foreign_keys='Relations.Bob_id', backref='bob')
+
 
 # 文书参与者类：Participants 参与者只有代写等等人，对于契约人不涉及，相当于将他们当作两种类型
 class Participants(db.Model):
     __tablename__ = 'Participants'  # 表名为 'Participants'
     
-    Person_id = Column(Integer,ForeignKey('Person.id'), primary_key=True, nullable=False)  # 主键。参与者序号，外键关联到人员id
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), primary_key=True, nullable=False)  # 主键。外键，关联到 'Documents' 表的 Doc_id
-    Part_role = Column(String(50), nullable=False)  # 参与者的角色（如签署人、见证人），非空
+    Person_id = Column(Integer,ForeignKey('People.Person_id'), primary_key=True, nullable=False)  # 主键。参与者序号，外键关联到人员id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), primary_key=True, nullable=False)  # 主键。外键，关联到 'Documents' 表的 Doc_id
+    Part_role = Column(String(50), nullable=False)  # 参与者的角色（如签署人、见证人），非空，这里直接让API去调取就可以了
 
 # 契约人类：Contractors
 class Contractors(db.Model):
-    __tablename__ = 'Contractors' #表名为 'Contractors'
+    __tablename__ = 'Contractors'
 
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), primary_key=True, nullable=False)  # 主键。外键，关联到 'Documents' 表的 Doc_id
-    Alice_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 契约人序号，外键关联到人员id
-    Bob_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 契约人序号，外键关联到人员id
-    
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), primary_key=True, nullable=False)
+    Alice_id = Column(Integer, ForeignKey('People.Person_id'), nullable=False)
+    Bob_id = Column(Integer, ForeignKey('People.Person_id'), nullable=False)
+
+    Alice = relationship('People', foreign_keys=[Alice_id])
+    Bob = relationship('People', foreign_keys=[Bob_id])
+
+
 # 人物关系类：Relations 
-class Relations(db.Model): 
-    __tablename__ = 'Relations' #表名为 'Relations'
+from sqlalchemy.orm import relationship
 
-    Alice_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 主键。契约人序号，外键关联到人员id
-    Bob_id=Column(Integer,ForeignKey('People.id'), nullable=False)  # 主键。契约人序号，外键关联到人员id
-    Relation_type = Column(String(50), nullable=True)  #关系名
-    
+class Relations(db.Model):
+    __tablename__ = 'Relations'  # 表名为 'Relations'
+
+    Alice_id = Column(Integer, ForeignKey('People.Person_id'), primary_key=True, nullable=False)
+    Bob_id = Column(Integer, ForeignKey('People.Person_id'), primary_key=True, nullable=False)
+    Relation_type = Column(String(50), nullable=True)
+
+    # 通过外键反向关系到 People 类
+    Alice = relationship('People', foreign_keys=[Alice_id], backref='relations_as_alice')
+    Bob = relationship('People', foreign_keys=[Bob_id], backref='relations_as_bob')
+
+    __table_args__ = (
+        db.Index('idx_Alice_Bob', 'Alice_id', 'Bob_id'),  # 联合索引
+    )
+
     
 # 用户类：Users
 class Users(db.Model):
@@ -124,7 +194,7 @@ class Highlights(db.Model):
     __tablename__ = 'Highlights'  # 表名为 'Highlights'
     
     Highlight_id = Column(Integer, primary_key=True, autoincrement=True)  # 高亮记录的序号，自增主键
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
     User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=False)  # 外键，关联到 'Users' 表的 User_id
     Highlight_startPosition = Column(Integer, nullable=False)  # 高亮起始位置（字符索引）
     Highlight_endPosition = Column(Integer, nullable=False)  # 高亮结束位置（字符索引）
@@ -145,7 +215,7 @@ class Notes(db.Model):
     __tablename__ = 'Notes'  # 表名为 'Notes'
     
     Note_id = Column(Integer, primary_key=True, autoincrement=True)  # 批注记录的序号，自增主键
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
     User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=False)  # 外键，关联到 'Users' 表的 User_id
     Note_annotationText = Column(Text, nullable=False)  # 批注内容，非空
     Note_startPosition = Column(Integer, nullable=False)  # 批注起始位置（字符索引）
@@ -167,7 +237,7 @@ class Folders(db.Model):
     
     Folder_id = Column(Integer, primary_key=True, autoincrement=True)  # 收藏夹的序号，自增主键
     User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=False)  # 外键，关联到用户ID
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'),nullable=False) # 外键，文书ID
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'),nullable=False) # 外键，文书ID
     Folder_name = Column(String(255), nullable=False)  # 收藏夹名称，非空
     Folder_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 收藏夹创建时间，默认为当前时间戳
 
@@ -184,7 +254,7 @@ class AuditLog(db.Model):
     __tablename__ = 'AuditLog'  # 表名为 'AuditLog'
     
     Audit_id = Column(Integer, primary_key=True, autoincrement=True)  # 审计记录的唯一标识符
-    User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=True)  # 外键，关联到 'Users' 表的 User_id（可为空）,一般为管理员
+    User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=True)  # 外键，关联到 'Users' 表的 User_id
     Audit_actionType = Column(String(50), nullable=False)  # 操作类型（如创建、更新等），非空
     Audit_actionDescription = Column(Text, nullable=False)  # 操作的详细描述，非空
     Audit_targetTable = Column(String(50), nullable=True)  # 被操作的表名
@@ -198,7 +268,7 @@ class Corrections(db.Model):
     __tablename__ = 'Corrections'  # 表名为 'Corrections'
     
     Correction_id = Column(Integer, primary_key=True, autoincrement=True)  # 纠错记录的唯一标识符
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
     User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=True)  # 外键，关联到 'Users' 表的 User_id
     Correction_text = Column(Text, nullable=False)  # 纠错内容，非空
     Correction_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 纠错提交时间，默认为当前时间戳
@@ -211,7 +281,7 @@ class Comments(db.Model):
     __tablename__ = 'Comments'  # 表名为 'Comments'
     
     Comment_id = Column(Integer, primary_key=True, autoincrement=True)  # 评论记录的唯一标识符
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
     User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=True)  # 外键，关联到 'Users' 表的 User_id
     Comment_text = Column(Text, nullable=False)  # 评论内容，非空
     Comment_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 评论创建时间，默认为当前时间戳
@@ -225,7 +295,7 @@ class Evernote(db.Model):
     
     Evernote_id = Column(Integer, primary_key=True, autoincrement=True)  # 笔记的唯一标识符
     User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=False)  # 外键，关联到 'Users' 表的 User_id
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
     Evernote_text = Column(Text,nullable=False) #笔记内容，非空
     Evernote_viewedAt = Column(TIMESTAMP, default=func.current_timestamp())  # 笔记时间，默认为当前时间戳
 
@@ -237,12 +307,13 @@ class UserBrowsingHistory(db.Model):
     __tablename__ = 'UserBrowsingHistory'  # 表名为 'UserBrowsingHistory'
     
     Browse_id = Column(Integer, primary_key=True, autoincrement=True)  # 浏览记录的序号，自增主键
-    User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=False)  # 外键，关联到 'Users' 表的 User_id
-    Doc_id = Column(Integer, ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
+    User_id = Column(Integer, ForeignKey('Users.User_id'), nullable=False)  # 外键���关联到 'Users' 表的 User_id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
     Browse_time = Column(TIMESTAMP, default=func.current_timestamp())  # 浏览时间，默认为当前时间戳
     
     # 定义索引优化查询
     __table_args__ = (
-    db.Index('idx_User_id_Doc_id', 'User_id', 'Doc_id'),  # 联合索引
-)
+        db.Index('idx_User_id_Doc_id', 'User_id', 'Doc_id'),  # 联合索引
+    )
 
+print("程序已成功运行")

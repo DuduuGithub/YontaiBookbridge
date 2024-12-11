@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from flask import Flask
 from app_blueprint import register_blueprints
 from Database.model import *
-
+from utils import *
 from Database.config import db
 import Database.config 
 
@@ -15,22 +15,21 @@ import Database.config
 
 
 def createApp():
-    
     app = Flask(__name__)
     # 加载配置
     app.config.from_object(Database.config)
 
     # 初始化数据库
-    db.app=app
+    db.app = app
     db.init_app(app)
- 
-     # 确保只在首次运行时创建数据库表
+
+    # 如果已经手动创建了数据库，可以删除自动创建表的代码
     with app.app_context():  # 创建应用上下文
-        if not os.path.exists(Database.config.SQLALCHEMY_DATABASE_URI):  # 检查数据库文件是否存在
-            db.create_all()  # 实现py表与数据库表的映射
-            print("数据库表已创建")
-        
-    #注册蓝图
+        # 这里不再调用 db.create_all()，因为你已经在 MySQL 中创建了表
+        # 如果你希望检查表是否存在，可以手动检查
+        print("数据库表已加载")
+
+    # 注册蓝图
     register_blueprints(app=app)
     
     return app
@@ -38,3 +37,10 @@ def createApp():
 
 app=createApp()
 app.run()
+
+# 返回一个JSON格式的收藏夹列表
+@app.route('/get_all_folders', methods=['GET'])
+def get_folders():
+
+    folders= db_query_all(Folders)
+    return jsonify(folders=folders)

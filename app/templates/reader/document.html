@@ -1,1 +1,39 @@
- 
+{% extends "../base.html" %}
+
+{% block content %}
+<div class="document-container my-4">
+    <div class="document-header mb-4">
+        <h2>{{ document.Doc_title }}</h2>
+        <div class="document-meta">
+            <span class="me-3">{{ document.Doc_court }}</span>
+            <span class="me-3">{{ document.Doc_type }}</span>
+            <span>{{ document.Doc_createdAt.strftime('%Y-%m-%d') }}</span>
+        </div>
+    </div>
+
+    <div class="document-content">
+        {{ document.Doc_text | safe }}
+    </div>
+</div>
+
+{% block styles %}
+<style>
+.document-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.document-meta {
+    color: #666;
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+.document-content {
+    line-height: 1.8;
+    margin-top: 30px;
+}
+</style>
+{% endblock %}
+{% endblock %} 
