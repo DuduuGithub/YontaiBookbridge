@@ -12,6 +12,14 @@ from Database.config import db
 import Database.config 
 from flask_login import LoginManager
 
+def init_database():
+    with app.app_context():
+        # 删除所有表
+        db.drop_all()
+        # 创建所有表
+        db.create_all()
+        print("数据库初始化完成！")
+        
 def createApp():
     app = Flask(__name__)
     # 加载配置
@@ -71,7 +79,7 @@ def show_table_fields(model):
 from Database.model import Users
 show_table_fields(Users)
 if __name__ == '__main__':
-    
+    #init_database()
     app.run(debug=True)
 
 
