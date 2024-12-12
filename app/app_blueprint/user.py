@@ -62,14 +62,24 @@ def login():
         password = request.form.get('password')
         remember = request.form.get('remember', False) == 'on'
         
-        user = db_one_filter_record(Users, 'User_name', username)
+        print(f"Login attempt - Username: {username}")
         
-        if user and check_password_hash(user.User_passwordHash, password):
-            login_user(user, remember=remember)
-            next_page = request.args.get('next')
-            if next_page:
-                return redirect(next_page)
-            return redirect(url_for('user.dashboard'))
+        # 测试数据库查询
+        user = db_one_filter_record(Users, 'User_name', username)
+        print(f"Query result - User found: {user is not None}")
+        
+        if user:
+            print(f"User details - ID: {user.User_id}, Role: {user.User_role}")
+            if check_password_hash(user.User_passwordHash, password):
+                print("Password check: Success")
+                login_user(user, remember=remember)
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+                return redirect(url_for('user.dashboard'))
+            else:
+                print("Password check: Failed")
+        
         else:
             flash('用户名或密码错误', 'danger')
     
@@ -139,7 +149,7 @@ def register():
                     if "User_name" in str(e):
                         flash('用户名已存在', 'danger')
                     elif "User_email" in str(e):
-                        flash('邮箱已被注册', 'danger')
+                        flash('邮箱已��注册', 'danger')
                     else:
                         flash('注册失败，请稍后重试', 'danger')
                 else:

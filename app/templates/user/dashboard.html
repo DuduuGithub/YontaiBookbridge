@@ -39,7 +39,7 @@
 <section class="user-brief">
     <div class="container">
         <div class="d-flex align-items-center">
-            <img src="{{ url_for('static', filename='images/avatar-' + current_user.avatar_id|default('1') + '.png') }}" 
+            <img src="{{ url_for('static', filename='images/avatar/avatar-' + current_user.avatar_id|default('1') + '.png') }}" 
                  class="dashboard-avatar me-4" alt="用户头像">
             <div>
                 <h2 class="mb-2">{{ current_user.username }}</h2>
@@ -94,7 +94,7 @@
                     </a>
                     {% else %}
                     <div class="text-center py-4 text-muted">
-                        暂无收藏
+                        暂无��藏
                     </div>
                     {% endfor %}
                 </div>

@@ -7,7 +7,7 @@ USERNAME = 'root'
 PASSWORD = '123456'
 HOST ='127.0.0.1'
 PORT = '3306'
-DATABASE ='java_bookdb'
+DATABASE ='永泰文书'
 DB_URI = 'mysql://{}:{}@{}:{}/{}?charset=utf8'.format(USERNAME,PASSWORD,HOST,PORT,DATABASE)
 
 SQLALCHEMY_DATABASE_URI = DB_URI

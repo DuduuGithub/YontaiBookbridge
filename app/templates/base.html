@@ -80,7 +80,7 @@
                     <div class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" 
                            id="userDropdown" role="button" data-bs-toggle="dropdown">
-                            <img src="{{ url_for('static', filename='images/avatar-' + current_user.avatar_id|default('1') + '.png') }}" 
+                            <img src="{{ url_for('static', filename='images/avatar/avatar-' + current_user.avatar_id|default('1') + '.png') }}" 
                                  class="user-avatar" alt="用户头像">
                             <span>{{ current_user.username }}</span>
                         </a>

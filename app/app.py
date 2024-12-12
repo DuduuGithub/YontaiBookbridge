@@ -21,7 +21,9 @@ def init_database():
         print("数据库初始化完成！")
         
 def createApp():
-    app = Flask(__name__)
+    app = Flask(__name__,
+               static_folder='static',  # 默认值，可以不写
+               static_url_path='/static')  # 默认值，可以不写
     # 加载配置
     app.config.from_object(Database.config)
     
@@ -32,6 +34,13 @@ def createApp():
     db.init_app(app)
 
     app.config['SQLALCHEMY_ECHO'] = True
+    
+    # 添加自定义过滤器
+    @app.template_filter('datetime')
+    def format_datetime(value):
+        if value is None:
+            return ""
+        return value.strftime('%Y-%m-%d %H:%M:%S')
     
     # 如果已经手动创建了数据库，可以删除自动创建表的代码
     with app.app_context():  # 创建应用上下文
@@ -64,22 +73,10 @@ def get_folders():
     folders = db_query_all(Folders)
     return jsonify(folders=folders)
 
-def show_table_fields(model):
-    """
-    打印模型的所有字段信息
-    """
-    print(f"\nTable name: {model.__tablename__}")
-    for column in model.__table__.columns:
-        print(f"Field: {column.name}")
-        print(f"Type: {column.type}")
-        print(f"Nullable: {column.nullable}")
-        print("---")
-
-# 使用方法
-from Database.model import Users
-show_table_fields(Users)
 if __name__ == '__main__':
-    #init_database() #当数据库表结构发生变化时，需要执行一下这个
+    
+    #当数据库表结构发生变化时，需要执行一下这个
+    # init_database() 
     app.run(debug=True)
 
 
