@@ -17,7 +17,7 @@ def init_database():
         # 删除所有表
         db.drop_all()
         # 创建所有表
-        db.create_all()
+        db.create_all()  #这个函数的功能是对数据库没有这个表的话，创建这个表，如果存在，则不改变
         print("数据库初始化完成！")
         
 def createApp():
@@ -79,7 +79,7 @@ def show_table_fields(model):
 from Database.model import Users
 show_table_fields(Users)
 if __name__ == '__main__':
-    #init_database()
+    #init_database() #当数据库表结构发生变化时，需要执行一下这个
     app.run(debug=True)
 
 
