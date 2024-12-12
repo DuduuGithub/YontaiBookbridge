@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}编辑个人信息 - {{ current_user.username }}{% endblock %}
+
+{% block styles %}
+<style>
+    .profile-section {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .avatar-selection {
+        display: flex;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .avatar-option {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 3px solid transparent;
+        transition: all 0.3s;
+    }
+    .avatar-option.selected {
+        border-color: var(--theme-color);
+    }
+    .form-label {
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="profile-section">
+        <h2 class="mb-4">编辑个人信息</h2>
+        
+        <form method="POST" action="{{ url_for('user.update_profile') }}">
+            <!-- 头像选择 -->
+            <div class="mb-4">
+                <label class="form-label">选择头像</label>
+                <div class="avatar-selection">
+                    {% for i in range(1, 6) %}
+                    <img src="{{ url_for('static', filename='images/avatar-' ~ i ~ '.png') }}"
+                         class="avatar-option {% if current_user.avatar_id == i %}selected{% endif %}"
+                         data-avatar-id="{{ i }}"
+                         onclick="selectAvatar(this)">
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="avatar_id" id="selected_avatar" 
+                       value="{{ current_user.avatar_id|default('1') }}">
+            </div>
+
+            <!-- 基本信息 -->
+            <div class="mb-3">
+                <label class="form-label">用户名</label>
+                <input type="text" class="form-control" name="username" 
+                       value="{{ current_user.username }}" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">邮箱</label>
+                <input type="email" class="form-control" name="email" 
+                       value="{{ current_user.email }}" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">修改密码</label>
+                <input type="password" class="form-control" name="new_password" 
+                       placeholder="留空表示不修改">
+            </div>
+
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">保存修改</button>
+                <a href="{{ url_for('user.dashboard') }}" class="btn btn-outline-secondary">返回</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function selectAvatar(element) {
+    // 移除其他头像的选中状态
+    document.querySelectorAll('.avatar-option').forEach(avatar => {
+        avatar.classList.remove('selected');
+    });
+    // 添加选中状态
+    element.classList.add('selected');
+    // 更新隐藏输入框的值
+    document.getElementById('selected_avatar').value = element.dataset.avatarId;
+}
+</script>
+{% endblock %}

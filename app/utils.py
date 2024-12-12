@@ -12,43 +12,127 @@ from Database.model import *
 
 from sqlalchemy import or_
 
+from flask import session
+from flask_login import current_user
 
 #在数据库中加一条记录
-def db_add(model,**kwargs):
-    try:
-        record = model(**kwargs)
-        db.session.add(record)
-        db.session.commit()
-    except Exception :
-        db.session.rollback()
-        print("db_add wrong")
-        raise
-
-#在数据库中以主键删除一条记录：(主键可能有两个)
-def db_delete_key(model,key):
-    record=model.query.get(key)
-    if record:
-        db.session.delete(record)  # 删除记录
-        db.session.commit()  # 提交事务
+def set_session_variables(db_session):
+    """设置数据库会话变量"""
+    # 从 Flask session 获取用户信息
+    if current_user.is_authenticated:
+        user_id = current_user.User_id
+        role = current_user.User_role
     else:
-        print("db_delete wrong")
+        user_id = None
+        role = 'NonMember'
+        
+    # 设置数据库会话变量
+    db_session.execute(text("SET @current_id = :user_id, @current_role = :role"), 
+                      {"user_id": user_id, "role": role})
+
+def db_add(model, **kwargs):
+    """
+    向数据库添加一条记录
+    :param model: 数据库模型类
+    :param kwargs: 字段名和值的键值对
+    :return: 添加的记录对象
+    """
+    try:
+        # 创建模型实例
+        instance = model(**kwargs)
+        # 添加到会话
+        db.session.add(instance)
+        
+        # 设置会话变量
+        set_session_variables(db.session)
+            
+        # 提交事务
+        db.session.commit()
+        return instance
+    except Exception as e:
+        # 发生错误时回滚
+        db.session.rollback()
+        print(f"db_add error: {e}")
+        raise e
+# 注册用户
+def db_add_register(model, **kwargs):
+    """
+    注册用户专用的数据库添加函数，包含手动添加审计日志
+    :param model: 数据库模型类（应该是 Users）
+    :param kwargs: 字段名和值的键值对
+    :return: 添加的记录对象
+    """
+    try:
+        # 创建模型实例
+        instance = model(**kwargs)
+        # 添加到会话
+        db.session.add(instance)
+        
+        # 设置会话变量
+        set_session_variables(db.session)
+            
+        # 提交事务
+        db.session.commit()
+
+        # 手动添加审计日志
+        audit_log = AuditLog(
+            User_id=instance.User_id,  # 新注册用户的ID
+            Audit_actionType='INSERT',
+            Audit_actionDescription=f'新用户注册: {instance.User_name}',
+            Audit_targetTable='Users'
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+
+        return instance
+    except Exception as e:
+        # 发生错误时回滚
+        db.session.rollback()
+        print(f"db_add_register error: {e}")
+        raise e
+    
+#在数据库中以主键删除一条记录：(主键可能有两个)
+def db_delete_key(model, key):
+    """
+    根据主键删除记录
+    """
+    try:
+        record = model.query.get(key)
+        if record:
+            # 设置会话变量
+            set_session_variables(db.session)
+            db.session.delete(record)
+            db.session.commit()
+        else:
+            print("db_delete wrong")
+    except Exception as e:
+        db.session.rollback()
+        print(f"db_delete error: {e}")
+        raise e
 
 
 # 更新,针对单一主键
 def db_update_key(model, key, **update_data):
-    # 通过主键查找记录
-    record = model.query.get(key)
-    
-    if record:
-        # 遍历字典并更新字段
-        for field, value in update_data.items():
-            if hasattr(record, field):  # 确保字段存在于模型中
-                setattr(record, field, value)  # 更新字段的值
-        
-        db.session.commit()  # 提交更新
-        return record  # 返回更新后的记录
-    
-    return None  # 如果记录不存在，返回 None
+    """
+    更新记录
+    """
+    try:
+        record = model.query.get(key)
+        if record:
+            # 设置会话变量
+            set_session_variables(db.session)
+            
+            # 更新字段
+            for field, value in update_data.items():
+                if hasattr(record, field):
+                    setattr(record, field, value)
+            
+            db.session.commit()
+            return record
+    except Exception as e:
+        db.session.rollback()
+        print(f"db_update error: {e}")
+        raise e
 
 #针对双主键
 def db_update_keys(model, key1,key2, **update_data):
@@ -89,7 +173,7 @@ def get_relation_by_ids(alice_id, bob_id):
     )
 #通用函数：根据一个字段名和值筛选出所有满足条件的记录
 def db_one_filter_records(model, column_name, value):
-    # 通过 getattr 动态获取模型的列属性
+    # 通过 getattr ���态获取模型的列属性
     column = getattr(model, column_name)
     
     # 执行查询，筛选出符合条件的记录
@@ -124,7 +208,7 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     :return: 返回符合条件的文档列表
     """
     
-    # 基础的全文检索 SQL 查询
+    # 基本的��文检索 SQL 查询
     sql = text("""
         SELECT * FROM Documents
         WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
@@ -254,7 +338,7 @@ def db_book_input(hard:str):
                 "大意": extracted_text[1],  # 第二个提取的内容为大意
                 "契约人": extracted_text[2],  # 第三个提取的内容为契约人
                 "关系类型": extracted_text[3],  # 第四个提取的内容为关系类型
-                "时间": extracted_text[4]  # 第五个提取的内容为时间
+                "时间": extracted_text[4]  # 第五个提取的内容时间
             }
             
             return result_dict
@@ -262,3 +346,18 @@ def db_book_input(hard:str):
         return save_as_dict(responseContent)
     
     # 下面需要补充 生成一个表记录对象 使用db_add来加入
+
+# 在现有函数之外添加新函数
+def db_one_filter_record(model, field, value):
+    """
+    根据单个字段查询一条记录
+    :param model: 数据库模型类
+    :param field: 字段名
+    :param value: 字段值
+    :return: 查询到的记录或None
+    """
+    try:
+        return model.query.filter(getattr(model, field) == value).first()
+    except Exception as e:
+        print(f"db_one_filter_record error: {e}")
+        return None

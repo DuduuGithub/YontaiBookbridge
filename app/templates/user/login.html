@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}登录 - 永泰文书{% endblock %}
+
+{% block styles %}
+<style>
+    .login-container {
+        max-width: 400px;
+        margin: 2rem auto;
+    }
+    .login-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .login-header img {
+        height: 80px;
+        margin-bottom: 1rem;
+    }
+    .login-form {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .form-floating {
+        margin-bottom: 1rem;
+    }
+    .login-footer {
+        text-align: center;
+        margin-top: 1rem;
+    }
+    .alert {
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-header">
+        <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="永泰文书">
+        <h2>欢迎回来</h2>
+    </div>
+
+    <div class="login-form">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('user.login') }}">
+            <div class="form-floating">
+                <input type="text" class="form-control" id="username" name="username" 
+                       placeholder="用户名" required>
+                <label for="username">用户名</label>
+            </div>
+            
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" 
+                       placeholder="密码" required>
+                <label for="password">密码</label>
+            </div>
+
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                <label class="form-check-label" for="remember">记住我</label>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg">登录</button>
+            </div>
+        </form>
+
+        <div class="login-footer">
+            <p class="mb-0">还没有账号？ <a href="{{ url_for('user.register') }}">立即注册</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

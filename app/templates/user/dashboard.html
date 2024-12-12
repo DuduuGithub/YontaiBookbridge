@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}个人中心 - {{ current_user.username }}{% endblock %}
+
+{% block styles %}
+<style>
+    .user-brief {
+        background-color: var(--theme-color);
+        color: white;
+        padding: 2rem 0;
+        margin-top: -1.5rem;
+    }
+    .dashboard-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        border: 3px solid rgba(255,255,255,0.3);
+    }
+    .history-card {
+        height: 400px;
+        overflow-y: auto;
+    }
+    .history-item {
+        padding: 0.75rem;
+        border-bottom: 1px solid #eee;
+    }
+    .history-item:last-child {
+        border-bottom: none;
+    }
+    .history-time {
+        font-size: 0.85rem;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 用户简介区域 -->
+<section class="user-brief">
+    <div class="container">
+        <div class="d-flex align-items-center">
+            <img src="{{ url_for('static', filename='images/avatar-' + current_user.avatar_id|default('1') + '.png') }}" 
+                 class="dashboard-avatar me-4" alt="用户头像">
+            <div>
+                <h2 class="mb-2">{{ current_user.username }}</h2>
+                <a href="{{ url_for('user.profile') }}" class="btn btn-outline-light">
+                    <i class="fas fa-user-edit me-1"></i>编辑个人信息
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 主要内容区域 -->
+<div class="container mt-4">
+    <div class="row">
+        <!-- 浏览历史 -->
+        <div class="col-md-8">
+            <div class="card history-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">最近浏览</h5>
+                    <a href="#" class="btn btn-sm btn-outline-primary">查看全部</a>
+                </div>
+                <div class="card-body p-0">
+                    {% for history in reading_history %}
+                    <div class="history-item">
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('reader.document', doc_id=history.Doc_id) }}" 
+                               class="text-decoration-none">{{ history.Doc_title }}</a>
+                            <span class="history-time">{{ history.Browse_time|datetime }}</span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        暂无浏览记录
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 收藏夹 -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">我的收藏</h5>
+                    <a href="#" class="btn btn-sm btn-outline-primary">管理收藏</a>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for folder in folders %}
+                    <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        {{ folder.Folder_name }}
+                        <span class="badge bg-primary rounded-pill">14</span>
+                    </a>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        暂无收藏
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

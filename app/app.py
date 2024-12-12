@@ -1,46 +1,79 @@
 import sys
 import os
 
-# 将项目根目录添加到 sys.path,Python默认从当前文件所在的目录开始找，也就是app文件夹开始找
+# 将项目根目录添加到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from flask import Flask
+from flask import Flask, redirect, url_for
 from app_blueprint import register_blueprints
 from Database.model import *
 from utils import *
 from Database.config import db
 import Database.config 
-
-
-
+from flask_login import LoginManager
 
 def createApp():
     app = Flask(__name__)
     # 加载配置
     app.config.from_object(Database.config)
-
+    
+    # 设置密钥
+    app.secret_key = os.environ.get('SECRET_KEY', 'dev')  # 在生产环境中应该使用环境变量
+    
     # 初始化数据库
-    db.app = app
     db.init_app(app)
 
+    app.config['SQLALCHEMY_ECHO'] = True
+    
     # 如果已经手动创建了数据库，可以删除自动创建表的代码
     with app.app_context():  # 创建应用上下文
-        # 这里不再调用 db.create_all()，因为你已经在 MySQL 中创建了表
-        # 如果你希望检查表是否存在，可以手动检查
         print("数据库表已加载")
 
     # 注册蓝图
     register_blueprints(app=app)
-    
+
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'user.login'
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return Users.query.get(int(user_id))
+
     return app
 
+app = createApp()
 
-app=createApp()
-app.run()
+# 根路由重定向到首页
+@app.route('/')
+def index():
+    return redirect(url_for('home.index'))
 
 # 返回一个JSON格式的收藏夹列表
 @app.route('/get_all_folders', methods=['GET'])
 def get_folders():
-
-    folders= db_query_all(Folders)
+    folders = db_query_all(Folders)
     return jsonify(folders=folders)
+
+def show_table_fields(model):
+    """
+    打印模型的所有字段信息
+    """
+    print(f"\nTable name: {model.__tablename__}")
+    for column in model.__table__.columns:
+        print(f"Field: {column.name}")
+        print(f"Type: {column.type}")
+        print(f"Nullable: {column.nullable}")
+        print("---")
+
+# 使用方法
+from Database.model import Users
+show_table_fields(Users)
+if __name__ == '__main__':
+    
+    app.run(debug=True)
+
+
+
+

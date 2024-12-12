@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}永泰文书 - 首页{% endblock %}
+
+{% block styles %}
+<style>
+    .hero-section {
+        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
+                    url("{{ url_for('static', filename='images/hero-bg.jpg') }}");
+        background-size: cover;
+        background-position: center;
+        color: white;
+        padding: 100px 0;
+        margin-top: -1.5rem;
+        margin-bottom: 3rem;
+    }
+    .feature-card {
+        transition: transform 0.3s;
+    }
+    .feature-card:hover {
+        transform: translateY(-5px);
+    }
+    .feature-icon {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section text-center">
+    <div class="container">
+        <h1 class="display-4 mb-4">永泰文书数字化平台</h1>
+        <p class="lead mb-5">探索历史文献，发现知识价值</p>
+        <a href="{{ url_for('reader.index') }}" class="btn btn-primary btn-lg me-3">开始阅读</a>
+        <a href="{{ url_for('analysis.index') }}" class="btn btn-outline-light btn-lg">数据分析</a>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="container">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card feature-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-book-reader feature-icon"></i>
+                    <h3 class="card-title">文书检阅</h3>
+                    <p class="card-text">便捷的文书浏览和检索功能，支持多维度查询和全文搜索。</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card feature-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-network feature-icon"></i>
+                    <h3 class="card-title">数据分析</h3>
+                    <p class="card-text">深入分析文书数据，展现历史人物关系网络。</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card feature-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-edit feature-icon"></i>
+                    <h3 class="card-title">个性化服务</h3>
+                    <p class="card-text">提供笔记、收藏等个性化功能，助力研究工作。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 添加资源链接部分 -->
+<section class="container mt-5">
+    <h2 class="text-center mb-4">相关资源</h2>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">数字人文门户</h5>
+                    <p class="card-text">提供丰富的数字人文研究资源和工具。</p>
+                    <a href="http://example.com/dh" class="btn btn-outline-primary" target="_blank">访问网站</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">历史文献数据库</h5>
+                    <p class="card-text">收录大量历史文献资料，支持在线检索。</p>
+                    <a href="http://example.com/archive" class="btn btn-outline-primary" target="_blank">访问网站</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">古籍研究中心</h5>
+                    <p class="card-text">专注于古籍整理与研究的学术机构。</p>
+                    <a href="http://example.com/research" class="btn btn-outline-primary" target="_blank">访问网站</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

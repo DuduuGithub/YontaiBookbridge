@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}注册 - 永泰文书{% endblock %}
+
+{% block styles %}
+<style>
+    .register-container {
+        max-width: 400px;
+        margin: 2rem auto;
+    }
+    .register-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .register-header img {
+        height: 80px;
+        margin-bottom: 1rem;
+    }
+    .register-form {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .form-floating {
+        margin-bottom: 1rem;
+    }
+    .register-footer {
+        text-align: center;
+        margin-top: 1rem;
+    }
+    .password-requirements {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: -0.5rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="register-container">
+    <div class="register-header">
+        <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="永泰文书">
+        <h2>创建账号</h2>
+    </div>
+
+    <div class="register-form">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('user.register') }}" id="registerForm">
+            <div class="form-floating">
+                <input type="text" class="form-control" id="username" name="username" 
+                       placeholder="用户名" required minlength="3" maxlength="20">
+                <label for="username">用户名</label>
+            </div>
+            
+            <div class="form-floating">
+                <input type="email" class="form-control" id="email" name="email" 
+                       placeholder="邮箱" required>
+                <label for="email">邮箱</label>
+            </div>
+            
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" 
+                       placeholder="密码" required minlength="6">
+                <label for="password">密码</label>
+            </div>
+            <div class="password-requirements">
+                密码至少包含6个字符
+            </div>
+            
+            <div class="form-floating">
+                <input type="password" class="form-control" id="confirm_password" 
+                       name="confirm_password" placeholder="确认密码" required>
+                <label for="confirm_password">确认密码</label>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg">注册</button>
+            </div>
+        </form>
+
+        <div class="register-footer">
+            <p class="mb-0">已有账号？ <a href="{{ url_for('user.login') }}">立即登录</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+    
+    if (password !== confirmPassword) {
+        e.preventDefault();
+        alert('两次输入的密码不一致！');
+    }
+});
+</script>
+{% endblock %} 
