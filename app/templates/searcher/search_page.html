@@ -1,42 +1,404 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Page</title>
-</head>
-<body>
-    <h1>Search Documents</h1>
-    <form action="/search" method="POST">
-        <!-- Full-text search input -->
-        <label for="query">Search (Full-Text): </label>
-        <input type="text" id="query" name="query" placeholder="Enter search keyword" required>
+{% extends "base.html" %}
 
-        <!-- Advanced filtering options -->
-        <br>
-        <label for="doc_type">Document Type:</label>
-        <select name="doc_type" id="doc_type">
-            <option value="">All</option>
-            <option value="Contract">Contract</option>
-            <option value="Agreement">Agreement</option>
-            <option value="Other">Other</option>
-        </select>
+{% block title %}文书检阅 - 永泰文书{% endblock %}
 
-        <br>
-        <label for="date_from">Date From:</label>
-        <input type="date" id="date_from" name="date_from">
+{% block styles %}
+<style>
+    .search-section {
+        background-color: #f8f9fa;
+        padding: 2rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    .filter-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .filter-content {
+        display: none;
+        position: absolute;
+        background-color: white;
+        min-width: 300px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 1rem;
+        border-radius: 4px;
+        z-index: 1000;
+        margin-top: 0.5rem;
+    }
+    .filter-content.show {
+        display: block;
+    }
+    .year-selector {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .year-selector select {
+        width: auto;
+    }
+    .document-card {
+        transition: transform 0.2s;
+    }
+    .document-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .category-tabs {
+        margin-bottom: 2rem;
+    }
+    .category-tabs .nav-link {
+        color: #495057;
+        border: none;
+        padding: 1rem 1.5rem;
+    }
+    .category-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom: 2px solid #0d6efd;
+        background: none;
+    }
+    #advancedSearchPanel {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        margin-top: 1rem;
+    }
+    #basicSearchGroup {
+        display: flex;  /* 使用 flex 布局 */
+        width: 100%;
+    }
 
-        <br>
-        <label for="date_to">Date To:</label>
-        <input type="date" id="date_to" name="date_to">
+    #advancedSearchGroup {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-top: 0.5rem;
+    }
 
-        <br>
-        <button type="submit">Search</button>
-    </form>
+    .input-group {
+        flex: 1;  /* 让搜索框占据剩余空间 */
+    }
+</style>
+{% endblock %}
 
-    <h2>Search Results</h2>
-    <ul id="results">
-        <!-- Search results will be dynamically inserted here -->
+{% block content %}
+<div class="container">
+    <!-- 搜索和筛选区域 -->
+    <div class="search-section">
+        <div class="row align-items-center">
+            <!-- 筛选按钮 -->
+            <div class="col-auto">
+                <div class="filter-dropdown">
+                    <button class="btn btn-outline-secondary" onclick="toggleFilter()">
+                        <i class="fas fa-filter"></i> 筛选
+                    </button>
+                    <div class="filter-content" id="filterContent">
+                        <!-- 时间筛选 -->
+                        <div class="mb-3">
+                            <label class="form-label">起始时间</label>
+                            <div class="year-selector">
+                                <select class="form-select" id="startEra">
+                                    <option value="">选择年号</option>
+                                    <option value="康熙">康熙</option>
+                                    <option value="雍正">雍正</option>
+                                    <option value="乾隆">乾隆</option>
+                                </select>
+                                <i class="fas fa-chevron-right"></i>
+                                <select class="form-select" id="startYear">
+                                    <!-- 动态生成年份 -->
+                                </select>
+                            </div>
+                            
+                            <label class="form-label mt-2">终止时间</label>
+                            <div class="year-selector">
+                                <select class="form-select" id="endEra">
+                                    <option value="">选择年号</option>
+                                    <option value="康熙">康熙</option>
+                                    <option value="雍正">雍正</option>
+                                    <option value="乾隆">乾隆</option>
+                                </select>
+                                <i class="fas fa-chevron-right"></i>
+                                <select class="form-select" id="endYear">
+                                    <!-- 动态生成年份 -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 文书类型筛选 -->
+                        <div class="mb-3">
+                            <label class="form-label">文书类型</label>
+                            <select class="form-select" id="documentType">
+                                <option value="">全部类型</option>
+                                <option value="借钱契">借钱契</option>
+                                <option value="租赁契">租赁契</option>
+                                <option value="抵押契">抵押契</option>
+                                <option value="赋税契">赋税契</option>
+                                <option value="诉状">诉状</option>
+                                <option value="判决书">判决书</option>
+                                <option value="祭祀契约">祭祀契约</option>
+                                <option value="祠堂契">祠堂契</option>
+                                <option value="劳役契">劳役契</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 搜索框 -->
+            <div class="col">
+                <!-- 基本搜索框 -->
+                <div class="input-group" id="basicSearchGroup">
+                    <input type="text" class="form-control" id="searchInput" 
+                           placeholder="输入关键词搜索...">
+                    <button class="btn btn-primary" onclick="performSearch()">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="toggleAdvancedSearch()">
+                        <i class="fas fa-search-plus"></i> 精细检索
+                    </button>
+                </div>
+
+                <!-- 精细搜索框 -->
+                <div id="advancedSearchGroup" style="display: none;">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="personSearch" 
+                                       placeholder="输入契约人或参与人姓名">
+                                <label for="personSearch">契约人/参与人</label>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="titleSearch" 
+                                       placeholder="输入文书标题">
+                                <label for="titleSearch">标题</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary h-100 w-100" onclick="performAdvancedSearch()">
+                                <i class="fas fa-filter"></i> 精确查找
+                            </button>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button class="btn btn-link text-muted" onclick="toggleAdvancedSearch()">
+                                <i class="fas fa-arrow-left"></i> 返回基本搜索
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分类标签页 -->
+    <ul class="nav nav-tabs category-tabs" id="documentTabs">
+        <li class="nav-item">
+            <a class="nav-link active" href="#all">全部文书</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#recent">最近上传</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#popular">热门文书</a>
+        </li>
     </ul>
-</body>
-</html>
+
+    <!-- 文书列表 -->
+    <div class="document-list">
+        <div id="resultCount" class="mb-3"></div>
+        <div id="documentList" class="row g-4">
+            <!-- 文书列表将通过 JavaScript 动态加载 -->
+        </div>
+        <!-- 分页控件 -->
+        <nav aria-label="Page navigation" class="d-flex justify-content-center mt-4">
+            <ul class="pagination" id="pagination">
+                <!-- 分页按钮将通过 JavaScript 动态生成 -->
+            </ul>
+        </nav>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentResults = [];
+const itemsPerPage = 7;
+let currentPage = 1;
+
+// 切换精细检索面板
+function toggleAdvancedSearch() {
+    const basicGroup = document.getElementById('basicSearchGroup');
+    const advancedGroup = document.getElementById('advancedSearchGroup');
+    
+    // 检查当前显示状态
+    const isAdvancedMode = advancedGroup.style.display === 'block';
+    
+    if (isAdvancedMode) {
+        // 切换回基本搜索
+        basicGroup.style.display = 'flex';  // 使用 flex 而不是 block
+        advancedGroup.style.display = 'none';
+        // 清空精细搜索框的值
+        document.getElementById('personSearch').value = '';
+        document.getElementById('titleSearch').value = '';
+    } else {
+        // 切换到精细搜索
+        basicGroup.style.display = 'none';
+        advancedGroup.style.display = 'block';
+        // 清空基本搜索框的值
+        document.getElementById('searchInput').value = '';
+    }
+}
+
+// 切换筛选面板
+function toggleFilter() {
+    const filterContent = document.getElementById('filterContent');
+    filterContent.classList.toggle('show');
+}
+
+// 点击其他地方关闭筛选和精细检索面板
+document.addEventListener('click', function(event) {
+    const filterDropdown = document.querySelector('.filter-dropdown');
+    const filterContent = document.getElementById('filterContent');
+    const advancedPanel = document.getElementById('advancedSearchPanel');
+    const advancedButton = document.querySelector('[onclick="toggleAdvancedSearch()"]');
+
+    // 处理筛选面板
+    if (!filterDropdown.contains(event.target)) {
+        filterContent.classList.remove('show');
+    }
+
+    // 处理精细检索面板
+    if (!advancedPanel.contains(event.target) && event.target !== advancedButton) {
+        advancedPanel.style.display = 'none';
+    }
+});
+
+// 阻止面板内部点击事件冒泡
+document.getElementById('filterContent').addEventListener('click', function(event) {
+    event.stopPropagation();
+});
+
+document.getElementById('advancedSearchPanel').addEventListener('click', function(event) {
+    event.stopPropagation();
+});
+
+// 修改搜索函数
+function performSearch() {
+    const keyword = document.getElementById('searchInput').value;
+    const startEra = document.getElementById('startEra').value;
+    const startYear = document.getElementById('startYear').value;
+    const endEra = document.getElementById('endEra').value;
+    const endYear = document.getElementById('endYear').value;
+    const docType = document.getElementById('documentType').value;
+
+    const searchParams = {
+        type: 'basic',
+        keyword: keyword,
+        startDate: startEra && startYear ? `${startEra}${startYear}年` : '',
+        endDate: endEra && endYear ? `${endEra}${endYear}年` : '',
+        docType: docType
+    };
+
+    // 发送搜索请求
+    fetch('/searcher/search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(searchParams)
+    })
+    .then(response => response.json())
+    .then(data => {
+        currentResults = data;
+        currentPage = 1;
+        updateResultsDisplay();
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// 精细搜索函数
+function performAdvancedSearch() {
+    const person = document.getElementById('personSearch').value;
+    const title = document.getElementById('titleSearch').value;
+    
+    // 构建搜索参数
+    const searchParams = {
+        type: 'advanced',
+        person: person,
+        title: title
+    };
+
+    // 发送搜索请求
+    fetch('/searcher/search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(searchParams)
+    })
+    .then(response => response.json())
+    .then(data => {
+        currentResults = data;
+        currentPage = 1;
+        updateResultsDisplay();
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// 根据年号生成年份选项
+function generateYears(eraSelect, yearSelect) {
+    eraSelect.addEventListener('change', function() {
+        const era = this.value;
+        yearSelect.innerHTML = '<option value="">选择年份</option>';
+        
+        let startYear, endYear;
+        switch(era) {
+            case '康熙':
+                startYear = 1; endYear = 61; break;
+            case '雍正':
+                startYear = 1; endYear = 13; break;
+            case '乾隆':
+                startYear = 1; endYear = 60; break;
+            default:
+                return;
+        }
+        
+        for(let i = startYear; i <= endYear; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `${i}年`;
+            yearSelect.appendChild(option);
+        }
+    });
+}
+
+// 初始化年份选择器
+document.addEventListener('DOMContentLoaded', function() {
+    const startEra = document.getElementById('startEra');
+    const startYear = document.getElementById('startYear');
+    const endEra = document.getElementById('endEra');
+    const endYear = document.getElementById('endYear');
+    
+    generateYears(startEra, startYear);
+    generateYears(endEra, endYear);
+    
+    // 加载初始文书列表
+    loadDocuments('all');
+    
+    // 设置基本搜索框的初始显示状态
+    const basicGroup = document.getElementById('basicSearchGroup');
+    basicGroup.style.display = 'flex';  // 使用 flex 而不是 block
+});
+
+// 添加筛选条件变化监听
+document.getElementById('startEra').addEventListener('change', performSearch);
+document.getElementById('startYear').addEventListener('change', performSearch);
+document.getElementById('endEra').addEventListener('change', performSearch);
+document.getElementById('endYear').addEventListener('change', performSearch);
+document.getElementById('documentType').addEventListener('change', performSearch);
+
+// 其他函数保持不变...
+</script>
+{% endblock %}

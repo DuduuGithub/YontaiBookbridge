@@ -1,30 +1,58 @@
 # 用户信息相关，有普通客户和管理员之分，管理员具有
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from utils import db_query_all, db_one_filter_records, db_update_key, db_one_filter_record, db_add
-from Database.model import UserBrowsingHistory, Folders, Notes, Users
+from Database.model import UserBrowsingHistory, Folders, Notes, Users, Documents, AuditLog
 from Database.config import db
+from datetime import datetime
+from sqlalchemy import func
+from functools import wraps
 
 user_bp = Blueprint('user', __name__, 
                    template_folder='app/templates/user',
                    static_folder='app/static/user',
                    url_prefix='/user')
 
+# 管理员权限装饰器
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.User_role != 'Admin':
+            flash('您没有权限访问该页面', 'danger')
+            return redirect(url_for('user.dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @user_bp.route('/dashboard')
 @login_required
 def dashboard():
-    # 获取用户数据
-    reading_history = db_one_filter_records(UserBrowsingHistory, 'User_id', current_user.User_id)
-    folders = db_one_filter_records(Folders, 'User_id', current_user.User_id)
-    
-    return render_template('user/dashboard.html',
-                         reading_history=reading_history[:10],  # 最近10条浏览记录
-                         folders=folders)
+    if current_user.User_role == 'Admin':
+        # 获取管理员统计数据
+        doc_count = Documents.query.count()
+        user_count = Users.query.count()
+        today = datetime.now().date()
+        today_visits = UserBrowsingHistory.query.filter(
+            func.date(UserBrowsingHistory.Browse_time) == today
+        ).count()
+        
+        return render_template('user/admin_dashboard.html',
+                             doc_count=doc_count,
+                             user_count=user_count,
+                             today_visits=today_visits)
+    else:
+        # 普通用户数据
+        reading_history = db_one_filter_records(UserBrowsingHistory, 'User_id', current_user.User_id)
+        folders = db_one_filter_records(Folders, 'User_id', current_user.User_id)
+        
+        return render_template('user/dashboard.html',
+                             reading_history=reading_history[:10],
+                             folders=folders)
 
 @user_bp.route('/profile')
 @login_required
 def profile():
+    """个人设置页面"""
     return render_template('user/profile.html')
 
 @user_bp.route('/update_profile', methods=['POST'])
@@ -96,7 +124,7 @@ def validate_username(username):
     if len(username) < 3 or len(username) > 20:
         return False, "用户名长度必须在3-20个字符之间"
     if not username.isalnum():
-        return False, "用户名只能包含字母和数字"
+        return False, "用户名不能包含字母和数字"
     return True, ""
 
 @user_bp.route('/register', methods=['GET', 'POST'])
@@ -149,7 +177,7 @@ def register():
                     if "User_name" in str(e):
                         flash('用户名已存在', 'danger')
                     elif "User_email" in str(e):
-                        flash('邮箱已��注册', 'danger')
+                        flash('邮箱已注册', 'danger')
                     else:
                         flash('注册失败，请稍后重试', 'danger')
                 else:
@@ -168,4 +196,49 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for('home.index'))
+
+@user_bp.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    # 获取统计数据
+    doc_count = Documents.query.count()
+    user_count = Users.query.count()
+    today = datetime.now().date()
+    today_visits = UserBrowsingHistory.query.filter(
+        func.date(UserBrowsingHistory.Browse_time) == today
+    ).count()
+    
+    return render_template('user/admin_dashboard.html',
+                         doc_count=doc_count,
+                         user_count=user_count,
+                         today_visits=today_visits)
+
+@user_bp.route('/manage_documents')
+@login_required
+@admin_required
+def manage_documents():
+    return render_template('user/manage_documents.html')
+
+@user_bp.route('/api/search_documents', methods=['POST'])
+@login_required
+@admin_required
+def search_documents():
+    data = request.get_json()
+    keyword = data.get('keyword', '').strip()
+    
+    # 使用现有的搜索函数
+    results = db_context_query(keyword)
+    return jsonify([doc.to_dict() for doc in results])
+
+@user_bp.route('/view_logs')
+@login_required
+@admin_required
+def view_logs():
+    """查看系统日志"""
+    # 从 AuditLog 表中获取日志记录
+    logs = AuditLog.query.order_by(AuditLog.Audit_timestamp.desc()).all()
+    return render_template('user/view_logs.html', logs=logs)
+
+# 添加其他必要的路由...
 

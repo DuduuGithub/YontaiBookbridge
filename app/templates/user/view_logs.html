@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}系统日志 - 永泰文书{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-3">
+            <!-- 侧边栏 -->
+            <div class="list-group">
+                <a href="{{ url_for('user.admin_dashboard') }}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-home"></i> 控制台首页
+                </a>
+                <a href="{{ url_for('user.manage_documents') }}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-file-alt"></i> 文书管理
+                </a>
+                <a href="{{ url_for('user.view_logs') }}" class="list-group-item list-group-item-action active">
+                    <i class="fas fa-history"></i> 系统日志
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header">
+                    <h4>系统操作日志</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>用户</th>
+                                    <th>操作类型</th>
+                                    <th>操作描述</th>
+                                    <th>目标表</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td>{{ log.Audit_timestamp|datetime }}</td>
+                                    <td>{{ log.User_id }}</td>
+                                    <td>{{ log.Audit_actionType }}</td>
+                                    <td>{{ log.Audit_actionDescription }}</td>
+                                    <td>{{ log.Audit_targetTable }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -29,23 +29,42 @@ from sqlalchemy.sql import func
 from Database.config import db
 from flask_login import UserMixin
 
-# 1、文书类：Documents
-class Documents(db.Model):
-    __tablename__ = 'Documents'  # 定义表名为 'Documents'
+#1、时间表
+class TimeRecord(db.Model):
+    __tablename__ = 'TimeRecord'
 
-    # 文书的基本字段
-    Doc_id = Column(String(20), primary_key=True)  # 文书序号，与书籍中编号一致
-    Doc_title = Column(String(255), nullable=False)  # 文书标题，非空
-    Doc_originalText = Column(Text, nullable=False)  # 文书的繁体原文，非空
-    Doc_simplifiedText = Column(Text)  # 文书的简体原文，默认为空
-    Doc_type = Column(Enum('借贷', '契约', '其他'), nullable=False)  # 文书类型，可参考第二次小组作业
-    Doc_summary = Column(Text)  # 文书的大意，默认为空
-    Doc_createdData = Column(String(50))  # 文书创建时间（如"康熙三年"）
-    Doc_updatedData = Column(String(50))  # 文书修改时间（如"康熙四年"）
-    Doc_createdGregorianDate = Column(DateTime)  # 文书公历创建时间
-    Doc_updatedGregorianDate = Column(DateTime)  # 文书公历修改时间
+    Time_id = Column(Integer, primary_key=True, autoincrement=True)
+    createdData = Column(String(50), nullable=False)  # 原始时间（"康熙三年"）
+    Standard_createdData = Column(TIMESTAMP, nullable=False)  # 标准化时间（公历时间）
+    __table_args__ = (
+        db.Index('idx_createdData', 'createdData'),
+        db.Index('idx_Standard_createdData', 'Standard_createdData'),
+        {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
+    )
+
+
+# 2、文书类：Documents
+class Documents(db.Model):
+    __tablename__ = 'Documents'
+
+    Doc_id = Column(String(20), primary_key=True)
+    Doc_title = Column(String(255), nullable=False)
+    Doc_originalText = Column(Text, nullable=False)
+    Doc_simplifiedText = Column(Text)
+    Doc_type = Column(Enum('借钱契', '租赁契', '抵押契','赋税契','诉状','判决书','祭祀契约','祠堂契','劳役契','其他'), nullable=False)
+    Doc_summary = Column(Text)
+    Doc_image_path = Column(String(255), nullable=False, default='images/document_img/doc_0.jpg')  # 文书图片路径
     
-    
+    # 修改外键关系
+    Doc_createdTime_id = Column(Integer, 
+                               ForeignKey('TimeRecord.Time_id', 
+                                        ondelete='SET NULL', 
+                                        onupdate='CASCADE'))
+    Doc_updatedTime_id = Column(Integer, 
+                               ForeignKey('TimeRecord.Time_id', 
+                                        ondelete='SET NULL', 
+                                        onupdate='CASCADE'))
+
     # 关系定义：
     participants = relationship('Participants', backref='document', cascade='all, delete-orphan')  # 与参与者的关系
     highlights = relationship('Highlights', backref='document', cascade='all, delete-orphan')  # 高亮记录
@@ -56,58 +75,13 @@ class Documents(db.Model):
 
     # 定义索引：帮助优化查询
     __table_args__ = (
-        db.Index('idx_Doc_id', 'Doc_id'),  # 为'文书序号'建立索引，使用正确的列名
+        db.Index('idx_Doc_id', 'Doc_id'),  # 为'文书序号'建立索引
         db.Index('idx_Doc_type', 'Doc_type'),  # 为'文书类型'创建索引
-        db.Index('idx_Doc_createdGregorianDate', 'Doc_createdGregorianDate'),  # 为文'书创建日期' 创建索引
-        db.Index('idx_doc_created_data', 'Doc_createdData'),  # 为文'书创建时间' 创建索引
-        db.Index('idx_doc_updated_data', 'Doc_updatedData'),  # 添加修改时间的索引
+        db.Index('idx_Doc_createdTime_id', 'Doc_createdTime_id'),  # 为'文书创建日期'创建索引
+        db.Index('idx_Doc_updatedTime_id', 'Doc_updatedTime_id'),  # 添加修改时间的索引
+        db.Index('ft_doc_content', 'Doc_title', 'Doc_simplifiedText', 'Doc_originalText', mysql_prefix='FULLTEXT'),
         {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     )
-
-#标准创建时间表
-class StandardCreationTime(db.Model):
-    __tablename__ = 'StandardCreationTime'
-
-    Time_id = Column(Integer, primary_key=True, autoincrement=True)  # 自增主键
-    createdData = Column(String(50), ForeignKey('Documents.Doc_createdData', ondelete='CASCADE'), nullable=False)  # 外键，引用 Doc_createdData
-    Standard_createdData = Column(TIMESTAMP, nullable=False)  # 标准化时间（公历时间）
-    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 Documents 表
-
-    # 修改关系定义，明确指定外键
-    document = relationship('Documents', 
-                          foreign_keys=[Doc_id],  # 明确指定使用 Doc_id 作为外键
-                          backref=db.backref('standard_creation_time', uselist=False))
-
-    # 在 Standard_creation_time 上建立索引，优化查询
-    __table_args__ = (
-        db.Index('idx_Standard_createdData', 'Standard_createdData'),  # 为标准时间字段添加索引
-        db.Index('idx_Doc_id', 'Doc_id'),  # 为 Doc_id 添加索引
-        {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
-    )
-
-
-#标准修改时间表
-class StandardUpdateTime(db.Model):
-    __tablename__ = 'StandardUpdateTime'
-
-    Time_id = Column(Integer, primary_key=True, autoincrement=True)  # 自增主键
-    updatedData = Column(String(50), ForeignKey('Documents.Doc_updatedData', ondelete='CASCADE'), nullable=False)  # 外键，引用 Doc_updatedData
-    Standard_updatedData = Column(DateTime, nullable=False)  # 标准化时间（公历时间）
-    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 Documents 表
-
-    # 修改关系定义，明确指定外键
-    document = relationship('Documents', 
-                          foreign_keys=[Doc_id],  # 明确指定使用 Doc_id 作为外键
-                          backref=db.backref('standard_update_time', uselist=False))
-
-    # 在 Standard_update_time 上建立索引，优化查询
-    __table_args__ = (
-        db.Index('idx_Standard_updatedData', 'Standard_updatedData'),  # 为标准时间字段添加索引
-        db.Index('idx_Doc_id', 'Doc_id'),  # 为 Doc_id 添加索引
-        {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
-    )
-
-
 
 # 2、文书关键词类：DocKeywords
 class DocKeywords(db.Model):
@@ -128,7 +102,7 @@ class DocKeywords(db.Model):
 class People(db.Model):
     __tablename__ = 'People'  # 表名为 'People'
 
-    Person_id = Column(Integer, primary_key=True, autoincrement=True)  # 人物序号，自增主键
+    Person_id = Column(Integer, primary_key=True, autoincrement=True)  # 人物序号，��增主键
     Person_name = Column(String(100), nullable=False)  # 人物名称
 
     __table_args__ = (
@@ -267,7 +241,7 @@ class Folders(db.Model):
     Folder_name = Column(String(255), nullable=False)  # 收藏夹名称，非空
     Folder_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 收藏夹创建时间，默认为当前时间戳
 
-    # 确保同一用户不能为同一文书创建多个相同名称的文件夹
+    # 确��同一用户不能为同一文书创建多个相同名称的文件夹
     __table_args__ = (
         db.UniqueConstraint('User_id', 'Doc_id', 'Folder_name', name='unique_folder_doc'),
         {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
@@ -282,7 +256,7 @@ class AuditLog(db.Model):
     
     Audit_id = Column(Integer, primary_key=True, autoincrement=True)  # 审计记录的唯一标识符
     User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='SET NULL'))  # 外键，关联到 'Users' 表的 User_id
-    Audit_actionType = Column(String(50), nullable=False)  # 操作类型（如创建、更新等），非空
+    Audit_actionType = Column(String(50), nullable=False)  # 操作类型（如创建、更新等）空
     Audit_actionDescription = Column(Text, nullable=False)  # 操作的详细描述，非空
     Audit_targetTable = Column(String(50))  # 被操作的表
     Audit_timestamp = Column(TIMESTAMP, default=func.current_timestamp())  # 操作时间，默认为当前时间戳
@@ -312,7 +286,7 @@ class Corrections(db.Model):
 
 # 评论类：Comments
 class Comments(db.Model):
-    __tablename__ = 'Comments'  # 表名为 'Comments'
+    __tablename__ = 'Comments'  # 表为 'Comments'
     
     Comment_id = Column(Integer, primary_key=True, autoincrement=True)  # 评论记录的唯一标识符
     Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
@@ -351,11 +325,46 @@ class UserBrowsingHistory(db.Model):
     Browse_id = Column(Integer, primary_key=True, autoincrement=True)  # 浏览记录的序号
     User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='CASCADE'), nullable=False)  # 外键，删除用户时级联删除浏览记录
     Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，删除文书时级联删除浏览记录
-    Browse_time = Column(TIMESTAMP, default=func.current_timestamp())  # 浏览��间，默认为当前时间戳
+    Browse_time = Column(TIMESTAMP, default=func.current_timestamp())  # 浏览时间，默认为当前时间戳
     
     __table_args__ = (
         db.Index('idx_User_id_Doc_id', 'User_id', 'Doc_id'),  # 联合索引，提高查询效率
         {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}  # 设置字符集
     )
+
+# 文书展示视图模型
+class DocumentDisplayView(db.Model):
+    """
+    文书展示视图
+    用于在页面中展示文书的基本信息，同时支持搜索功能
+    """
+    __tablename__ = 'DocumentDisplayView'
+    __table_args__ = {'info': {'is_view': True}}
+    
+    Doc_id = Column(String(20), primary_key=True)
+    Doc_title = Column(String(255))         # 文书标题
+    Doc_type = Column(Enum('借钱契', '租赁契', '抵押契','赋税契','诉状','判决书','祭祀契约','祠堂契','劳役契','其他'))  # 文书类型
+    Doc_summary = Column(Text)              # 文书大意
+    Doc_image_path = Column(String(255))         # 文书图片路径
+    Doc_time = Column(String(50))           # 签约时间（原始格式）
+    Doc_standardTime = Column(TIMESTAMP)    # 签约时间（公历格式）
+    ContractorInfo = Column(Text)           # 格式：《张三》《李四》（叔侄）
+    ParticipantInfo = Column(Text)          # 格式：《王五》（见证人）《赵六》（代书）
+
+    def __repr__(self):
+        return f'<DocumentDisplay {self.Doc_title}>'
+    
+    def to_dict(self):
+        """转换为字典格式，方便JSON序列化"""
+        return {
+            'doc_id': self.Doc_id,
+            'title': self.Doc_title,
+            'type': self.Doc_type,
+            'time': self.Doc_time,
+            'image': self.Doc_image,
+            'summary': self.Doc_summary[:200] + '...' if self.Doc_summary and len(self.Doc_summary) > 200 else self.Doc_summary,
+            'contractors': self.ContractorInfo,
+            'participants': self.ParticipantInfo
+        }
 
 print("程序已成功运行")

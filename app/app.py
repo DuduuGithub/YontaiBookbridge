@@ -3,7 +3,7 @@ import os
 
 # 将项目根目录添加到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+from werkzeug.security import generate_password_hash
 from flask import Flask, redirect, url_for
 from app_blueprint import register_blueprints
 from Database.model import *
@@ -19,7 +19,23 @@ def init_database():
         # 创建所有表
         db.create_all()  #这个函数的功能是对数据库没有这个表的话，创建这个表，如果存在，则不改变
         print("数据库初始化完成！")
-        
+def create_admin():
+    with app.app_context():
+        # 检查管理员是否已存在
+        if not Users.query.filter_by(User_name='admin').first():
+            admin = Users(
+                User_name='admin',
+                User_passwordHash=generate_password_hash('admin123'),
+                User_email='admin@example.com',
+                User_role='Admin',
+                avatar_id='1'
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("管理员账户创建成功")
+        else:
+            print("管理员账户已存在")
+             
 def createApp():
     app = Flask(__name__,
                static_folder='static',  # 默认值，可以不写
@@ -62,7 +78,7 @@ def createApp():
 
 app = createApp()
 
-# 根路由重定向到首页
+# 根路由重���向到首页
 @app.route('/')
 def index():
     return redirect(url_for('home.index'))
@@ -77,6 +93,7 @@ if __name__ == '__main__':
     
     #当数据库表结构发生变化时，需要执行一下这个
     # init_database() 
+    create_admin() # 创建管理员账户
     app.run(debug=True)
 
 

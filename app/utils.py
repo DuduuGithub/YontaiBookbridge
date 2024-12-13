@@ -173,7 +173,7 @@ def get_relation_by_ids(alice_id, bob_id):
     )
 #通用函数：根据一个字段名和值筛选出所有满足条件的记录
 def db_one_filter_records(model, column_name, value):
-    # 通过 getattr ���态获取模型的列属性
+    # 通过 getattr 动态获取模型的列属性
     column = getattr(model, column_name)
     
     # 执行查询，筛选出符合条件的记录
@@ -208,7 +208,7 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     :return: 返回符合条件的文档列表
     """
     
-    # 基本的��文检索 SQL 查询
+    # 基本的文检索 SQL 查询
     sql = text("""
         SELECT * FROM Documents
         WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
@@ -247,13 +247,6 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     
     # 返回检索到的结果，列表形式
     return documents
-
-
-
-
-
-
-
 
 
 import opencc
@@ -361,3 +354,36 @@ def db_one_filter_record(model, field, value):
     except Exception as e:
         print(f"db_one_filter_record error: {e}")
         return None
+
+def db_advanced_search(title=None, person=None):
+    """
+    在 DocumentDisplayView 视图中进行精细搜索
+    使用正则表达式在《》内匹配人名
+    """
+    try:
+        query = text("""
+            SELECT * FROM DocumentDisplayView
+            WHERE (:title IS NULL OR Doc_title LIKE :title_pattern)
+            AND (
+                :person IS NULL OR 
+                ContractorInfo REGEXP :person_pattern OR 
+                ParticipantInfo REGEXP :person_pattern
+            )
+        """)
+        
+        # 构建正则表达式模式：匹配《》内的人名
+        person_pattern = f"《[^》]*{person}[^》]*》" if person else None
+        
+        params = {
+            'title': title,
+            'title_pattern': f'%{title}%' if title else None,
+            'person': person,
+            'person_pattern': person_pattern
+        }
+        
+        # 执行查询
+        result = db.session.execute(query, params)
+        return result.fetchall()
+    except Exception as e:
+        print(f"Advanced search error: {str(e)}")
+        return []
