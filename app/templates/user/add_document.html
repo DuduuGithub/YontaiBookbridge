@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}添加文书 - 永泰文书{% endblock %}
+
+{% block styles %}
+<style>
+    .preview-image {
+        max-width: 100%;
+        max-height: 300px;
+        margin-top: 1rem;
+    }
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    #imagePreview {
+        display: none;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+    .loading-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 添加闪现消息显示 -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="row">
+        <div class="col-md-3">
+            <!-- 侧边栏 -->
+            <div class="list-group">
+                <a href="{{ url_for('user.admin_dashboard') }}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-home"></i> 控制台首页
+                </a>
+                <a href="{{ url_for('user.manage_documents') }}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-file-alt"></i> 文书管理
+                </a>
+                <a href="{{ url_for('user.view_logs') }}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-history"></i> 系统日志
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header">
+                    <h4>添加新文书</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="documentForm" 
+                          class="form-container">
+                        <!-- 文书图片上传 -->
+                        <div class="mb-3">
+                            <label for="document_image" class="form-label">文书图片</label>
+                            <input type="file" class="form-control" id="document_image" 
+                                   name="document_image" accept="image/*" required>
+                        </div>
+                        
+                        <!-- 图片预览区域 -->
+                        <div id="imagePreview" class="mb-3">
+                            <img src="" alt="预览图片" class="preview-image">
+                        </div>
+                        
+                        <!-- 文书文本输入 -->
+                        <div class="mb-3">
+                            <label for="document_text" class="form-label">文书文本</label>
+                            <textarea class="form-control" id="document_text" name="document_text" 
+                                      rows="10" required></textarea>
+                        </div>
+                        
+                        <!-- 提交按钮 -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="fas fa-plus"></i> 添加文书
+                            </button>
+                            <a href="{{ url_for('user.manage_documents') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 返回
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 加载中遮罩 -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner-border text-light mb-3" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h5>正在处理文书信息，请稍候...</h5>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 图片预览功能
+document.getElementById('document_image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('imagePreview');
+            preview.style.display = 'block';
+            preview.querySelector('img').src = e.target.result;
+        }
+        reader.readAsDataURL(file);
+    }
+});
+
+// 表单提交处理
+document.getElementById('documentForm').addEventListener('submit', function(e) {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const textArea = document.getElementById('document_text');
+    const imageInput = document.getElementById('document_image');
+    
+    // 表单验证
+    if (!textArea.value.trim()) {
+        e.preventDefault();
+        alert('请输入文书文本');
+        return;
+    }
+    
+    if (!imageInput.files || !imageInput.files[0]) {
+        e.preventDefault();
+        alert('请选择文书图片');
+        return;
+    }
+    
+    // 显示加载遮罩
+    loadingOverlay.style.display = 'block';
+
+    // 添加超时处理
+    setTimeout(function() {
+        if (loadingOverlay.style.display === 'block') {
+            loadingOverlay.style.display = 'none';
+            alert('处理超时，请重试');
+        }
+    }, 30000); // 30秒超时
+});
+
+// 添加错误提示自动消失
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            alert.style.display = 'none';
+        });
+    }, 5000); // 5秒后自动隐藏
+});
+
+// 关闭警告框
+document.querySelectorAll('.alert .btn-close').forEach(button => {
+    button.addEventListener('click', function() {
+        this.closest('.alert').remove();
+    });
+});
+</script>
+{% endblock %} 

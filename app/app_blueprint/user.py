@@ -2,12 +2,23 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from utils import db_query_all, db_one_filter_records, db_update_key, db_one_filter_record, db_add
+from utils import (
+    db_query_all, 
+    db_one_filter_records, 
+    db_update_key, 
+    db_one_filter_record, 
+    db_add,
+    process_document_text,  # 添加这个导入
+    insert_document        # 添加这个导入
+)
 from Database.model import UserBrowsingHistory, Folders, Notes, Users, Documents, AuditLog
 from Database.config import db
 from datetime import datetime
 from sqlalchemy import func
 from functools import wraps
+import os
+from werkzeug.utils import secure_filename
+from flask import current_app
 
 user_bp = Blueprint('user', __name__, 
                    template_folder='app/templates/user',
@@ -239,6 +250,87 @@ def view_logs():
     # 从 AuditLog 表中获取日志记录
     logs = AuditLog.query.order_by(AuditLog.Audit_timestamp.desc()).all()
     return render_template('user/view_logs.html', logs=logs)
+
+# 允许的图片文件扩展名
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@user_bp.route('/add_document', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def add_document():
+    if request.method == 'POST':
+        try:
+            # 获取文书图片
+            if 'document_image' not in request.files:
+                flash('没有上传文件', 'danger')
+                return redirect(request.url)
+            
+            file = request.files['document_image']
+            if file.filename == '':
+                flash('没有选择文件', 'danger')
+                return redirect(request.url)
+            
+            if file and allowed_file(file.filename):
+                try:
+                    # 安全地获取文件名并保存
+                    filename = secure_filename(file.filename)
+                    # 确保存储路径存在
+                    upload_folder = os.path.join(current_app.static_folder, 'images', 'documents')
+                    os.makedirs(upload_folder, exist_ok=True)
+                    # 保存文件
+                    file_path = os.path.join(upload_folder, filename)
+                    file.save(file_path)
+                    print(f"文件已保存到: {file_path}")
+                except Exception as e:
+                    print(f'保存文件失败: {str(e)}')
+                    flash(f'保存文件失败: {str(e)}', 'danger')
+                    return redirect(request.url)
+                
+                # 获取文书文本
+                original_text = request.form.get('document_text', '').strip()
+                if not original_text:
+                    flash('文书文本不能为空', 'danger')
+                    return redirect(request.url)
+                
+                try:
+                    # 处理文书信息
+                    relative_path = os.path.join('images', 'documents', filename)
+                    print(f"开始处理文书信息...")
+                    doc_info = process_document_text(original_text, relative_path)
+                    print(f"文书信息处理完成: {doc_info}")
+                except Exception as e:
+                    print(f'处理文书信息失败: {str(e)}')
+                    flash(f'处理文书信息失败: {str(e)}', 'danger')
+                    return redirect(request.url)
+                
+                try:
+                    # 插入数据库
+                    print(f"开始插入数据库...")
+                    success, message = insert_document(doc_info)
+                    print(f"数据库操作结果: success={success}, message={message}")
+                    if success:
+                        flash('文书添加成功', 'success')
+                        return redirect(url_for('user.manage_documents'))
+                    else:
+                        flash(f'文书添加失败: {message}', 'danger')
+                        return redirect(request.url)
+                except Exception as e:
+                    print(f'数据库操作失败: {str(e)}')
+                    flash(f'数据库操作失败: {str(e)}', 'danger')
+                    return redirect(request.url)
+            else:
+                flash('不支持的文件类型', 'danger')
+                return redirect(request.url)
+                
+        except Exception as e:
+            print(f'发生错误: {str(e)}')
+            flash(f'发生错误: {str(e)}', 'danger')
+            return redirect(request.url)
+            
+    return render_template('user/add_document.html')
 
 # 添加其他必要的路由...
 

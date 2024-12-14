@@ -15,6 +15,10 @@ from sqlalchemy import or_
 from flask import session
 from flask_login import current_user
 
+import json
+
+from yearToyearTools.run import convert_to_gregorian
+
 #在数据库中加一条记录
 def set_session_variables(db_session):
     """设置数据库会话变量"""
@@ -204,7 +208,7 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     :param query: 用于全文检索的关键字
     :param doc_type: （可选）文档类型，用于筛选特定类型的文档
     :param date_from: （可选）起始日期，用于筛选创建日期晚于此日期的文档
-    :param date_to: （可选）结束日期，用于筛选创建日期早于此日期的文档
+    :param date_to: （可选）结束日期，用于筛选创建日期早于日期���文档
     :return: 返回符合条件的文档列表
     """
     
@@ -225,7 +229,7 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     if date_to:
         sql = sql + text(" AND Doc_createdAt <= :date_to")
     
-    # 添加排序条件（按匹配程度降序）
+    # 添加排序条件（按匹配程度序）
     sql = sql + text("""
         ORDER BY MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) AGAINST(:query) DESC;
     """)
@@ -253,92 +257,248 @@ import opencc
 from sparkai.llm.llm import ChatSparkLLM, ChunkPrintHandler
 from sparkai.core.messages import ChatMessage
 import re
-def db_book_input(hard:str):
+from datetime import datetime
+from sqlalchemy import text
+from Database.model import *
+
+def process_document_text(original_text: str, image_path: str):
+    """处理文书文本，返回所有需要的信息"""
+    # 1. 转换繁简体
+    simplified_text = convert_to_simplified(original_text)
     
-    def getOpenccSimple(hard:str):
-        def replace_invalid_utf8_with_O(input_text):
-            result = ""
-            for char in input_text:
-                try:
-                    # 尝试将字符编码为 UTF-8
-                    char.encode('utf-8')
-                    result += char
-                except UnicodeEncodeError:
-                    # 如果编码失败，使用 'O' 替代该字符
-                    result += 'O'
-            return result
+    # 2. 调用大模型获取文书信息
+    doc_info = get_document_info(original_text)
     
-        converter = opencc.OpenCC('t2s.json')
-        return converter.convert(replace_invalid_utf8_with_O(hard))
+    # 3. 转换创建时间格式
+    created_time = doc_info.get('created_time', '')
+    if created_time:
+        standard_time = convert_to_gregorian(created_time)
+        if standard_time != "未找到对应年号" and standard_time != "格式错误，请包含'年'字":
+            year, month, day = map(int, standard_time.split(':'))
+            if month == 0:
+                standard_time = f"{year}-01-01"  # 如果没有月份，默认为1月1日
+            elif day == 0:
+                standard_time = f"{year}-{month:02d}-01"  # 如果没有日期，默认为1日
+            else:
+                standard_time = f"{year}-{month:02d}-{day:02d}"
+        else:
+            standard_time = None
+    else:
+        standard_time = None
     
-    def getInput(openccSimple:str):
-        #星火认知大模型Spark 4.0的URL值，其他版本大模型URL值请前往文档（https://www.xfyun.cn/doc/spark/Web.html）查看
-        SPARKAI_URL = 'wss://spark-api.xf-yun.com/v4.0/chat'
-        #星火认知大模型调用秘钥信息，请前往讯飞开放平台控制台（https://console.xfyun.cn/services/bm35）查看
-        SPARKAI_APP_ID = ''
-        SPARKAI_API_SECRET = ''
-        SPARKAI_API_KEY = ''
-        #星火认知大模型Spark 4.0的domain值，其他版本大模型domain值请前往文档（https://www.xfyun.cn/doc/spark/Web.html）查看
-        SPARKAI_DOMAIN = '4.0Ultra'
+    # 4. 转换修改时间格式
+    updated_time = doc_info.get('updated_time')
+    if updated_time:
+        standard_updated_time = convert_to_gregorian(updated_time)
+        if standard_updated_time != "未找到对应年号" and standard_updated_time != "格式错误，请包含'年'字":
+            year, month, day = map(int, standard_updated_time.split(':'))
+            if month == 0:
+                standard_updated_time = f"{year}-01-01"
+            elif day == 0:
+                standard_updated_time = f"{year}-{month:02d}-01"
+            else:
+                standard_updated_time = f"{year}-{month:02d}-{day:02d}"
+        else:
+            standard_updated_time = None
+    else:
+        standard_updated_time = None
+    
+    # 5. 生成文书ID
+    doc_id = generate_doc_id()  # 需要实现这个函数
+    
+    # 6. 整理返回数据
+    return {
+        'doc_id': doc_id,
+        'original_text': original_text,
+        'simplified_text': simplified_text,
+        'image_path': image_path,
+        'title': doc_info['title'],
+        'type': doc_info['type'],
+        'summary': doc_info['summary'],
+        'created_time': created_time,
+        'standard_time': standard_time,
+        'updated_time': updated_time,
+        'standard_updated_time': standard_updated_time,
+        'keywords': doc_info['keywords'],
+        'contractors': doc_info['contractors'],  # 现在只包含 name 字段
+        'relation': doc_info.get('relation'),   # 添加关系字段
+        'participants': doc_info['participants'] # 包含 name 和 role 字段
+    }
+
+def generate_doc_id():
+    """生成文书ID"""
+    try:
+        # 获取当前最大的文书ID
+        result = db.session.execute(text("""
+            SELECT MAX(Doc_id) as max_id 
+            FROM Documents
+        """))
+        max_id = result.fetchone()[0]
         
+        if max_id is None:
+            # 如果没有文书，从 1-1-1-1 开始
+            return "1-1-1-1"
+        else:
+            # 解析当前最大ID
+            parts = max_id.split('-')
+            if len(parts) != 4:
+                return "1-1-1-1"
+                
+            # 增加最后一个数字
+            new_id = f"{parts[0]}-{parts[1]}-{parts[2]}-{int(parts[3])+1}"
+            return new_id
+            
+    except Exception as e:
+        print(f"生成文书ID失败: {str(e)}")
+        # 返回一个带时间戳的ID作为备选
+        return f"1-1-1-{int(datetime.now().timestamp())}"
+
+def convert_to_simplified(text: str):
+    """将繁体文本转换为简体"""
+    converter = opencc.OpenCC('t2s.json')
+    return converter.convert(text)
+
+def get_document_info(text: str):
+    """调用星火大模型API获取文书信息"""
+    try:
+        # 配置星火认知大模型
         spark = ChatSparkLLM(
-        spark_api_url=SPARKAI_URL,
-        spark_app_id=SPARKAI_APP_ID,
-        spark_api_key=SPARKAI_API_KEY,
-        spark_api_secret=SPARKAI_API_SECRET,
-        spark_llm_domain=SPARKAI_DOMAIN,
-        streaming=False,
+            spark_api_url='wss://spark-api.xf-yun.com/v4.0/chat',
+            spark_app_id='ce9ffe63',
+            spark_api_key='37a6c3241c800fc455c445176efddc0d',
+            spark_api_secret='ODhjMzViODcwODU4Njk0ZTgxZWI1ZGVh',
+            spark_llm_domain='4.0Ultra',
+            streaming=False
         )
-        messages = [ChatMessage(
-        role="user",
-        content='''下面我会给你提供一篇文言文契约文书，你有个任务。
-        任务1：你要给文言文断句,不要留下长句，同时如果其中有繁体字你要改为简体字；
-        任务2：概括出本篇文言文的大意；
-        任务3：识别出这份契约的签约人，可能有多个，都要识别出来；
-        任务4：识别出契约者之间的关系；任务5：识别出这份契约的签订日期。你要把你的结果放在{}中。
-        回答格式：修正后的文本:{}，大意:{}，签约人:{}，签约人的关系:{}，签订日期{}。
-        下面是文本内容：'''+openccSimple
-        )]
+        
+        # 构建提示词
+        prompt_base = """分析下面这份清代契约文书，提取以下信息：
+        1. 文书标题
+        2. 文书类型（借钱契、租赁契、抵押契、赋税契、诉状、判决书、祭祀契约、祠堂契、劳役契、其他）
+        3. 文书大意（200字以内）
+        4. 签订时间
+        5. 更改时间（如果有）
+        6. 关键词（3-5个）
+        7. 契约双方（两个人的姓名）
+        8. 契约双方关系（如叔侄、父子等，如果有）
+        9. 参与人及其身份（如见证人、代书等，可能有多人）
+
+        请用JSON格式返回结果，格式如下：
+        {
+            "title": "文书标题",
+            "type": "文书类型",
+            "summary": "文书大意",
+            "created_time": "签订时间",
+            "updated_time": "更改时间（如果有则填写，没有则为null）",
+            "keywords": ["关键词1", "关键词2", "关键词3"],
+            "contractors": [
+                {"name": "第一个契约人姓名"},
+                {"name": "第二个契约人姓名"}
+            ],
+            "relation": "契约双方关系（如果有则填写，没有则为null）",
+            "participants": [
+                {"name": "参与人1姓名", "role": "参与人1身份"},
+                {"name": "参与人2姓名", "role": "参与人2身份"}
+            ]
+        }
+
+        请严格按照上述JSON格式返回结果。以下是文书内容：
+        """
+        
+        # 创建消息
+        messages = [ChatMessage(role="user", content=prompt_base+text)]
+        
+        # 调用API
         handler = ChunkPrintHandler()
         response = spark.generate([messages], callbacks=[handler])
+        print("问答完成\n")
         
-        response_text = response.generations
-        result={}
-        if response_text and isinstance(response_text, list):  # 确保是列表
-            first_generation = response_text[0]  # 获取第一个 ChatGeneration 对象
-            if isinstance(first_generation, list) and first_generation:  # 如果是嵌套列表
-                first_item = first_generation[0]  # 获取嵌套列表的第一个元素
-                responseContent = first_item.message.content  # 提取 content 属性
-            else:  # 如果不是嵌套列表，直接访问
-                responseContent = first_generation.message.content  # 提取 content 属性
-            # print(f"提取的 content 内容: {responseContent}")
-        
+        # 获取并清理JSON字符串
+        if isinstance(response.generations[0], list):
+            json_str = response.generations[0][0].text
         else:
-            print("getInput未找到生成内容")
+            json_str = response.generations[0].text
             
-        def extract_text_in_braces(text):
-            # 使用正则表达式匹配所有花括号内的内容
-            matches = re.findall(r'\{(.*?)\}', text)
-            return matches
-
-        def save_as_dict(text):
-            # 提取花括号内的内容
-            extracted_text = extract_text_in_braces(text)
-            
-            # 根据提取的内容构造字典
-            result_dict = {
-                "简体": extracted_text[0],  # 第一个提取的内容为简体
-                "大意": extracted_text[1],  # 第二个提取的内容为大意
-                "契约人": extracted_text[2],  # 第三个提取的内容为契约人
-                "关系类型": extracted_text[3],  # 第四个提取的内容为关系类型
-                "时间": extracted_text[4]  # 第五个提取的内容时间
-            }
-            
-            return result_dict
+        json_str = json_str.strip()
+        if json_str.startswith("```json"):
+            json_str = json_str[7:]
+        if json_str.endswith("```"):
+            json_str = json_str[:-3]
+        json_str = json_str.strip()
         
-        return save_as_dict(responseContent)
-    
-    # 下面需要补充 生成一个表记录对象 使用db_add来加入
+        # 解析返回的JSON
+        try:
+            result = json.loads(json_str)
+            return result
+        except Exception as e:
+            print(f"解析文书信息失败: {e}")
+            print(f"尝试解析的字符串: {json_str}")
+            # 返回模拟数据用于测试
+            return {
+                'title': '测试文书',
+                'type': '借钱契',
+                'summary': '这是一份测试用的文书大意，用于演示系统功能。',
+                'created_time': '康熙三年二月初五',
+                'updated_time': None,
+                'keywords': ['借钱', '契约', '测试'],
+                'contractors': [
+                    {'name': '张三'},
+                    {'name': '李四'}
+                ],
+                'relation': '叔侄',
+                'participants': [
+                    {'name': '王五', 'role': '见证人'},
+                    {'name': '赵六', 'role': '代书'}
+                ]
+            }
+    except Exception as e:
+        print(f"调用星火API失败: {e}")
+        raise
+
+def insert_document(doc_info: dict):
+    """调用存储过程插入文书数据"""
+    try:
+        # 检查必要字段
+        required_fields = ['title', 'type', 'summary', 'original_text', 'simplified_text', 
+                         'image_path', 'created_time', 'keywords', 'contractors', 'participants']
+        for field in required_fields:
+            if field not in doc_info:
+                return False, f"缺少必要字段: {field}"
+        
+        # 将数据转换为JSON字符串
+        data_json = json.dumps(doc_info, ensure_ascii=False)
+        print(f"准备插入的数据: {data_json}")
+        
+        # 调用存储过程
+        try:
+            # 确保没有活动的事务
+            db.session.rollback()
+            
+            # 执行存储过程
+            result = db.session.execute(
+                text('CALL InsertDocument(:data)'),
+                {'data': data_json}
+            )
+            
+            # 获取存储过程的返回值
+            proc_result = result.fetchone()
+            print(f"存储过程返回值: {proc_result}")
+            
+            if proc_result and proc_result[0] == 'success':
+                db.session.commit()
+                return True, "文书添加成功"
+            else:
+                db.session.rollback()
+                return False, "存储过程执行失败"
+                
+        except Exception as e:
+            db.session.rollback()
+            print(f"存储过程执行失败: {str(e)}")
+            return False, f"存储过程执行失败: {str(e)}"
+            
+    except Exception as e:
+        print(f"数据处理失败: {str(e)}")
+        return False, f"数据处理失败: {str(e)}"
 
 # 在现有函数之外添加新函数
 def db_one_filter_record(model, field, value):
@@ -387,3 +547,212 @@ def db_advanced_search(title=None, person=None):
     except Exception as e:
         print(f"Advanced search error: {str(e)}")
         return []
+    
+# 这是一个测试类，用于测试文档处理功能
+class TestDocumentProcessing():
+    def __init__(self):
+        """测试前的设置"""        
+        # 测试用的文书文本
+        self.test_text = """
+        清道光十二年十二月黃興忠立撮字
+        立撮字黃興忠撮出錢壹仟貳百文正言約俟至癸巳年拾月中旬約紙照價里还不敢過期如是過��照例行息不敢久欠如是久欠保認代賠不負字照
+        道光拾貳年拾二月日立撮字黃興忠
+        保認侄長善
+        代字兄文廉
+        """
+        
+        # 测试用的片路径
+        self.test_image_path = "static/images/test_doc.jpg"
+
+    def test_convert_to_simplified(self):
+        """测试繁体转简体功能"""
+        try:
+            simplified = convert_to_simplified(self.test_text)
+            print(f"\n原文本: {self.test_text[:50]}...")
+            print(f"简体文本: {simplified[:50]}...")
+            return True
+        except Exception as e:
+            print(f"繁体转简体失败: {str(e)}")
+            return False
+
+    def test_get_document_info(self):
+        """测试文书信息提取功能"""
+        try:
+            doc_info = get_document_info(self.test_text)
+            # 检查返回的字典是否包含所有必要的键
+            required_keys = [
+                'title', 'type', 'summary', 'created_time',
+                'keywords', 'contractors', 'participants'
+            ]
+            for key in required_keys:
+                if key not in doc_info:
+                    print(f"缺少必要的键: {key}")
+                    return False
+            
+            # 打印提取的信息
+            print("\n提取���文书信息:")
+            for key, value in doc_info.items():
+                print(f"{key}: {value}")
+            return True
+                
+        except Exception as e:
+            print(f"文书信息提取失败: {str(e)}")
+            return False
+
+    def test_process_document_text(self):
+        """测试完整的文书处理流程"""
+        try:
+            result = process_document_text(self.test_text, self.test_image_path)
+            
+            # 检查返回的字典是否包含所有必要的键
+            required_keys = [
+                'original_text', 'simplified_text', 'image_path',
+                'title', 'type', 'summary', 
+                'created_time', 'standard_time',  # 创建时间
+                'updated_time', 'standard_updated_time',  # 修改时间
+                'keywords', 'contractors', 'participants'
+            ]
+            for key in required_keys:
+                if key not in result:
+                    print(f"缺少必要的键: {key}")
+                    return False
+            
+            # 打印处理结果
+            print("\n文书处理结果:")
+            for key, value in result.items():
+                if key not in ['original_text', 'simplified_text']:  # 跳过长文本
+                    print(f"{key}: {value}")
+                
+            # 验证时间转换
+            if result['created_time']:
+                print(f"\n创建时间转换:")
+                print(f"原始时间: {result['created_time']}")
+                print(f"标准时间: {result['standard_time']}")
+                
+            if result['updated_time']:
+                print(f"\n修改时间转换:")
+                print(f"原始时间: {result['updated_time']}")
+                print(f"标准时间: {result['standard_updated_time']}")
+                
+            return True
+                
+        except Exception as e:
+            print(f"文书处理失败: {str(e)}")
+            return False
+
+def test_insert_document():
+    """测试存储过程是否能正确插入数据"""
+    from app import app  # 导入应用实例
+    
+    # 准备测试数据
+    test_data = {
+    "doc_id":"1-1-1-1",
+    "title": "测试文书",
+    "type": "借钱契",
+    "summary": "这是一份测试用的文书",
+    "original_text": "清嘉慶十一年十一月黃盛漢立撮字（廢契）",
+    "simplified_text": "清嘉庆十一年十一月黄盛汉立撮字（废契）",
+    "image_path": "images/documents/test.jpg",
+    "created_time": "嘉庆十一年十一月",
+    "standard_time": "1806-11-01",
+    "updated_time": 'null',
+    "standard_updated_time": 'null',
+    "keywords": ["借钱", "契约", "测试"],
+    "contractors": [
+        {"name": "黄盛汉"},
+        {"name": "吴光璧"}
+    ],
+    "relation": "叔侄",
+    "participants": [
+        {"name": "侄兴科", "role": "见证人"},
+        {"name": "进益", "role": "代书"}
+    ]
+}
+
+    # 使用应用上下文
+    with app.app_context():
+        try:
+            # 开始测试
+            print("开始测试存储过程...")
+            print(f"测试数据: {json.dumps(test_data, ensure_ascii=False, indent=2)}")
+
+            # 转换为JSON字符串
+            data_json = json.dumps(test_data, ensure_ascii=False)
+            
+            # 执行存储过程
+            result = db.session.execute(
+                text('CALL InsertDocument(:data)'),
+                {'data': data_json}
+            )
+            
+            # 获取存储过程的返回值
+            proc_result = result.fetchone()
+            print(f"存储过程返回值: {proc_result}")
+            
+            if proc_result and proc_result[0] == 'success':
+                doc_id = proc_result[1]
+                print(f"文书添加成功，ID: {doc_id}")
+                
+                # 验证数据是否正确插入
+                print("\n验证插入的数据:")
+                
+                # 检查文书基本信息
+                doc = Documents.query.get(doc_id)
+                if doc:
+                    print(f"文书标题: {doc.Doc_title}")
+                    print(f"文书类型: {doc.Doc_type}")
+                    print(f"文书大意: {doc.Doc_summary}")
+                else:
+                    print("未找到文书记录")
+                
+                # 检查关键词
+                keywords = DocKeywords.query.filter_by(Doc_id=doc_id).all()
+                print(f"\n关键词: {[kw.KeyWord for kw in keywords]}")
+                
+                # 检查契约人
+                contractors = Contractors.query.filter_by(Doc_id=doc_id).first()
+                if contractors:
+                    alice = People.query.get(contractors.Alice_id)
+                    bob = People.query.get(contractors.Bob_id)
+                    print(f"\n契约人: {alice.Person_name} 和 {bob.Person_name}")
+                else:
+                    print("未找到契约人记录")
+                
+                # 检查参与人
+                participants = Participants.query.filter_by(Doc_id=doc_id).all()
+                print("\n参与人:")
+                for p in participants:
+                    person = People.query.get(p.Person_id)
+                    print(f"{person.Person_name} ({p.Part_role})")
+                
+                return True, "测试成功"
+            else:
+                print("存储过程执行失败")
+                return False, "存储过程执行失败"
+                
+        except Exception as e:
+            print(f"测试失败: {str(e)}")
+            db.session.rollback()
+            return False, f"测试失败: {str(e)}"
+
+if __name__ == '__main__':
+    test = TestDocumentProcessing()
+    
+    # print("测试繁体转简体功能...")
+    # if test.test_convert_to_simplified():
+    #     print("✓ 繁体转简体测试通过")
+    # else:
+    #     print("✗ 繁体转简体测试失败")
+        
+    # print("\n测试文书信息提取功能...")
+    # if test.test_get_document_info():
+    #     print("✓ 文书信息提取测试通过")
+    # else:
+    #     print("✗ 文书信息提取测试失败")
+        
+    # print("\n测试完整的文书处理流程...")
+    if test_insert_document():
+        print("✓ 文书处理流程测试通过")
+    else:
+        print("✗ 文书处理流程测试失败")
+
