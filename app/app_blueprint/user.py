@@ -11,7 +11,7 @@ from utils import (
     process_document_text,  # 添加这个导入
     insert_document        # 添加这个导入
 )
-from Database.model import UserBrowsingHistory, Folders, Notes, Users, Documents, AuditLog
+from Database.model import UserBrowsingHistory, Folders, Notes, Users, Documents, AuditLog, DocumentDisplayView
 from Database.config import db
 from datetime import datetime
 from sqlalchemy import func
@@ -19,6 +19,8 @@ from functools import wraps
 import os
 from werkzeug.utils import secure_filename
 from flask import current_app
+import re
+from sqlalchemy import or_
 
 user_bp = Blueprint('user', __name__, 
                    template_folder='app/templates/user',
@@ -103,7 +105,7 @@ def login():
         
         print(f"Login attempt - Username: {username}")
         
-        # 测试数据库查询
+        # 测试数据库查���
         user = db_one_filter_record(Users, 'User_name', username)
         print(f"Query result - User found: {user is not None}")
         
@@ -131,7 +133,7 @@ def validate_password(password):
     return True, ""
 
 def validate_username(username):
-    """验证用户名"""
+    """验证用名"""
     if len(username) < 3 or len(username) > 20:
         return False, "用户名长度必须在3-20个字符之间"
     if not username.isalnum():
@@ -173,7 +175,7 @@ def register():
                 User_email=email,
                 User_passwordHash=generate_password_hash(password),
                 User_role='Member',  # 默认角色
-                avatar_id='1'  # 默认头像
+                avatar_id='1'  # 默���头像
             )
             
             try:
@@ -197,7 +199,7 @@ def register():
                 
         except Exception as e:
             print(f"注册过程错误: {str(e)}")
-            flash('注册失败，请稍后重试', 'danger')
+            flash('注册失败，请稍重试', 'danger')
             return render_template('user/register.html')
             
     return render_template('user/register.html')
@@ -235,12 +237,40 @@ def manage_documents():
 @login_required
 @admin_required
 def search_documents():
-    data = request.get_json()
-    keyword = data.get('keyword', '').strip()
-    
-    # 使用现有的搜索函数
-    results = db_context_query(keyword)
-    return jsonify([doc.to_dict() for doc in results])
+    try:
+        data = request.get_json()
+        keyword = data.get('keyword', '').strip()
+        
+        if not keyword:
+            # 如果没有搜索关键词，返回所有文书
+            results = DocumentDisplayView.query.all()
+        else:
+            # 使用视图进行搜索，添加册号搜索
+            results = DocumentDisplayView.query.filter(
+                or_(
+                    DocumentDisplayView.Doc_id.like(f'%{keyword}%'),  # 添加册号搜索
+                    DocumentDisplayView.Doc_title.like(f'%{keyword}%'),
+                    DocumentDisplayView.ContractorInfo.like(f'%{keyword}%'),
+                    DocumentDisplayView.ParticipantInfo.like(f'%{keyword}%')
+                )
+            ).all()
+        
+        # 格式化结果
+        formatted_results = [{
+            'doc_id': doc.Doc_id,
+            'title': doc.Doc_title,
+            'type': doc.Doc_type,
+            'time': doc.Doc_time,
+            'standard_time': doc.Doc_standardTime.strftime('%Y-%m-%d') if doc.Doc_standardTime else '',
+            'contractors': doc.ContractorInfo,
+            'participants': doc.ParticipantInfo
+        } for doc in results]
+        
+        return jsonify(formatted_results)
+        
+    except Exception as e:
+        print(f"搜索文书时出错: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/view_logs')
 @login_required
@@ -263,6 +293,17 @@ def allowed_file(filename):
 def add_document():
     if request.method == 'POST':
         try:
+            # 获取并验证册号
+            doc_id = request.form.get('doc_id')
+            if not doc_id or not re.match(r'^\d+-\d+-\d+-\d+$', doc_id):
+                flash('册号格式不正确', 'danger')
+                return redirect(request.url)
+            
+            # 检查册号是否已存在
+            if Documents.query.get(doc_id):
+                flash('该册号已存在', 'danger')
+                return redirect(request.url)
+                
             # 获取文书图片
             if 'document_image' not in request.files:
                 flash('没有上传文件', 'danger')
@@ -275,15 +316,22 @@ def add_document():
             
             if file and allowed_file(file.filename):
                 try:
-                    # 安全地获取文件名并保存
-                    filename = secure_filename(file.filename)
+                    # 根据册号生成新的文件名
+                    file_ext = file.filename.rsplit('.', 1)[1].lower()
+                    new_filename = f'doc_img_{doc_id}.{file_ext}'
+                    
                     # 确保存储路径存在
                     upload_folder = os.path.join(current_app.static_folder, 'images', 'documents')
                     os.makedirs(upload_folder, exist_ok=True)
+                    
                     # 保存文件
-                    file_path = os.path.join(upload_folder, filename)
+                    file_path = os.path.join(upload_folder, new_filename)
                     file.save(file_path)
                     print(f"文件已保存到: {file_path}")
+                    
+                    # 使用相对路径
+                    relative_path = os.path.join('images', 'documents', new_filename)
+                    
                 except Exception as e:
                     print(f'保存文件失败: {str(e)}')
                     flash(f'保存文件失败: {str(e)}', 'danger')
@@ -297,9 +345,10 @@ def add_document():
                 
                 try:
                     # 处理文书信息
-                    relative_path = os.path.join('images', 'documents', filename)
                     print(f"开始处理文书信息...")
                     doc_info = process_document_text(original_text, relative_path)
+                    # 添加文书册号
+                    doc_info['doc_id'] = doc_id
                     print(f"文书信息处理完成: {doc_info}")
                 except Exception as e:
                     print(f'处理文书信息失败: {str(e)}')
@@ -322,7 +371,7 @@ def add_document():
                     flash(f'数据库操作失败: {str(e)}', 'danger')
                     return redirect(request.url)
             else:
-                flash('不支持的文件类型', 'danger')
+                flash('不支持的文件���型', 'danger')
                 return redirect(request.url)
                 
         except Exception as e:
@@ -331,6 +380,30 @@ def add_document():
             return redirect(request.url)
             
     return render_template('user/add_document.html')
+
+@user_bp.route('/check_doc_id', methods=['POST'])
+@login_required
+@admin_required
+def check_doc_id():
+    try:
+        data = request.get_json()
+        doc_id = data.get('doc_id')
+        
+        # 检查格式
+        if not re.match(r'^\d+-\d+-\d+-\d+$', doc_id):
+            return jsonify({'exists': True, 'message': '册号格式不正确'})
+        
+        # 检查是否存在
+        existing_doc = Documents.query.get(doc_id)
+        
+        return jsonify({
+            'exists': existing_doc is not None,
+            'message': '册号已存在' if existing_doc else '册号可用'
+        })
+        
+    except Exception as e:
+        print(f'检查册号时出错: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 # 添加其他必要的路由...
 

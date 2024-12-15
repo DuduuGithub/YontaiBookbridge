@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text, or_
 from Database.model import *
 from Database.config import db
+from yearToyearTools.run import convert_to_gregorian
 
 searcher_bp=Blueprint('searcher',__name__,template_folder='app/templates/searcher',static_folder='app/static/searcher',url_prefix='/searcher')
 
@@ -20,46 +21,150 @@ def index():
 def search():
     try:
         data = request.get_json()
-        search_type = data.get('type', 'basic')  # 搜索类型：basic 或 advanced
+        if not data:
+            print("No JSON data received")
+            return jsonify({'error': 'No data received'}), 400
+            
+        print("Received search request:", data)
+        
+        search_type = data.get('type', 'basic')
+        page = data.get('page', 1)
+        per_page = 9
+        
+        # 构建基础查询
+        query = DocumentDisplayView.query
+        
+        # 处理时间筛选
+        start_date = data.get('startDate')
+        end_date = data.get('endDate')
+        
+        if start_date:
+            # 转换为公历日期
+            standard_start = convert_to_gregorian(start_date)
+            if standard_start and ':' in standard_start:
+                year, month, day = map(int, standard_start.split(':'))
+                if month == 0:
+                    standard_start = f"{year}-01-01"
+                else:
+                    standard_start = f"{year}-{month:02d}-01"
+                query = query.filter(DocumentDisplayView.Doc_standardTime >= standard_start)
+        
+        if end_date:
+            # 转换为公历日期
+            standard_end = convert_to_gregorian(end_date)
+            if standard_end and ':' in standard_end:
+                year, month, day = map(int, standard_end.split(':'))
+                if month == 0:
+                    standard_end = f"{year}-12-31"
+                else:
+                    standard_end = f"{year}-{month:02d}-31"
+                query = query.filter(DocumentDisplayView.Doc_standardTime <= standard_end)
+        
+        # 处理文书类型筛选
+        doc_type = data.get('docType')
+        if doc_type:
+            # 直接使用 Doc_type 而不是 Doc_category
+            query = query.filter(DocumentDisplayView.Doc_type == doc_type)
         
         if search_type == 'advanced':
             # 精细搜索
             person = data.get('person', '').strip()
             title = data.get('title', '').strip()
-            results = db_advanced_search(title=title, person=person)
+            content = data.get('content', '').strip()
             
-            # 格式化结果
-            formatted_results = [{
-                'Doc_id': row.Doc_id,
-                'Doc_title': row.Doc_title,
-                'Doc_type': row.Doc_type,
-                'Doc_createdData': row.Doc_createdData,
-                'Doc_summary': row.Doc_summary,
-                'Participants': row.Participants,
-                'Contractors': row.Contractors
-            } for row in results]
+            if person:
+                query = query.filter(
+                    or_(
+                        DocumentDisplayView.ContractorInfo.like(f'%{person}%'),
+                        DocumentDisplayView.ParticipantInfo.like(f'%{person}%')
+                    )
+                )
+            if title:
+                query = query.filter(DocumentDisplayView.Doc_title.like(f'%{title}%'))
+            if content:
+                # 这里可以调用全文搜索函数
+                content_results = db_context_query(content)
+                content_ids = [doc.Doc_id for doc in content_results]
+                if content_ids:
+                    query = query.filter(DocumentDisplayView.Doc_id.in_(content_ids))
+                else:
+                    return jsonify({
+                        'documents': [],
+                        'total_pages': 0,
+                        'current_page': page
+                    })
         else:
-            # 基本搜索（全文检索）
+            # 基本搜索
             keyword = data.get('keyword', '').strip()
-            doc_type = data.get('docType')
-            start_date = data.get('startDate')
-            end_date = data.get('endDate')
-            
-            results = db_context_query(
-                query=keyword,
-                doc_type=doc_type,
-                date_from=start_date,
-                date_to=end_date
-            )
-            
-            # 格式化结果
-            formatted_results = [doc.to_dict() for doc in results]
-
-        return jsonify(formatted_results)
-
+            if keyword:
+                query = query.filter(
+                    or_(
+                        DocumentDisplayView.Doc_id.like(f'%{keyword}%'),
+                        DocumentDisplayView.Doc_title.like(f'%{keyword}%'),
+                        DocumentDisplayView.ContractorInfo.like(f'%{keyword}%'),
+                        DocumentDisplayView.ParticipantInfo.like(f'%{keyword}%')
+                    )
+                )
+        
+        # 执行分页查询
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        total_pages = pagination.pages
+        documents = pagination.items
+        
+        # 格式化结果
+        def format_contractors(contractor_info):
+            """格式化契约人信息"""
+            if not contractor_info:
+                return ''
+            # 移除所有《》
+            text = contractor_info.replace('《', '').replace('》', '')
+            # 处理关系
+            if '（' in text:
+                names, relation = text.split('（')
+                relation = relation.rstrip('）')
+                # 只有在关系不为 null 且不为空时才显示
+                if relation and relation.lower() != 'null':
+                    return f"{names}, {relation}"
+                return names
+            return text
+        
+        def format_participants(participant_info):
+            """格式化参与人信息"""
+            if not participant_info:
+                return []
+            result = []
+            # 分割每个参与人信息
+            parts = participant_info.split('《')
+            for part in parts:
+                if not part:
+                    continue
+                # 处理每个参与人
+                part = part.strip('》')
+                if '（' in part:
+                    name, role = part.split('（')
+                    role = role.rstrip('）')
+                    if name and role:  # 确保名字和角色都不为空
+                        result.append(f"{name}（{role}）")
+            return result
+        
+        formatted_results = [{
+            'doc_id': doc.Doc_id,
+            'title': doc.Doc_title,
+            'type': doc.Doc_type,
+            'summary': doc.Doc_summary,
+            'contractors': format_contractors(doc.ContractorInfo),
+            'participants': format_participants(doc.ParticipantInfo)
+        } for doc in documents]
+        
+        return jsonify({
+            'documents': formatted_results,
+            'total_pages': total_pages,
+            'current_page': page
+        })
+        
     except Exception as e:
-        print(f"Search error: {str(e)}")
-        return jsonify([])
+        print(f"搜索文书时出错: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @searcher_bp.route('/documents/<category>')
 def get_documents(category):

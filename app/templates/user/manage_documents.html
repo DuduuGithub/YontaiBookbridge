@@ -26,7 +26,8 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="input-group" style="width: 70%;">
-                            <input type="text" class="form-control" id="searchInput" placeholder="搜索文书...">
+                            <input type="text" class="form-control" id="searchInput" 
+                                   placeholder="搜索册号、标题、契约人或参与人...">
                             <button class="btn btn-primary" onclick="searchDocuments()">
                                 <i class="fas fa-search"></i> 搜索
                             </button>
@@ -41,21 +42,8 @@
             <!-- 文书列表 -->
             <div class="card">
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>标题</th>
-                                    <th>类型</th>
-                                    <th>创建时间</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="documentsList">
-                                <!-- 文书列表将通过 JavaScript 动态加载 -->
-                            </tbody>
-                        </table>
+                    <div class="row g-4" id="documentsList">
+                        <!-- 文书列表将通过 JavaScript 动态加载 -->
                     </div>
                 </div>
             </div>
@@ -84,6 +72,11 @@
 
 {% block scripts %}
 <script>
+// 页面加载时获取所有文书
+document.addEventListener('DOMContentLoaded', function() {
+    searchDocuments();
+});
+
 // 搜索文书
 function searchDocuments() {
     const keyword = document.getElementById('searchInput').value;
@@ -101,29 +94,102 @@ function searchDocuments() {
 
 // 更新文书列表
 function updateDocumentsList(documents) {
-    const tbody = document.getElementById('documentsList');
-    tbody.innerHTML = '';
+    const container = document.getElementById('documentsList');
+    container.innerHTML = '';
+    
+    if (documents.length === 0) {
+        container.innerHTML = `
+            <div class="col-12 text-center text-muted">
+                <p>暂无文书数据</p>
+            </div>
+        `;
+        return;
+    }
     
     documents.forEach(doc => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${doc.doc_id}</td>
-            <td>${doc.title}</td>
-            <td>${doc.type}</td>
-            <td>${doc.time}</td>
-            <td>
-                <button class="btn btn-sm btn-primary" onclick="viewDocument('${doc.doc_id}')">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteDocument('${doc.doc_id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-lg-4';
+        card.innerHTML = `
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title mb-0">${doc.title}</h5>
+                        <span class="badge bg-secondary">${doc.doc_id}</span>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <small class="text-muted d-block">创建时间：${doc.time}</small>
+                        <small class="text-muted d-block">公历时间：${doc.standard_time || '无'}</small>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <h6 class="mb-1">契约人：</h6>
+                        <p class="mb-0 text-primary">${doc.contractors || '无'}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="mb-1">参与人：</h6>
+                        <p class="mb-0 text-success">${doc.participants || '无'}</p>
+                    </div>
+                </div>
+                
+                <div class="card-footer bg-transparent border-top-0">
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-sm btn-primary" onclick="viewDocument('${doc.doc_id}')">
+                            <i class="fas fa-eye"></i> 查看
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteDocument('${doc.doc_id}')">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                    </div>
+                </div>
+            </div>
         `;
-        tbody.appendChild(row);
+        container.appendChild(card);
     });
 }
 
-// 其他函数...
+// 查看文书详情
+function viewDocument(docId) {
+    window.location.href = `/reader/document/${docId}`;
+}
+
+// 删除文书
+function deleteDocument(docId) {
+    if (confirm('确定要删除这份文书吗？')) {
+        // 实现删除功能
+    }
+}
 </script>
+
+<style>
+/* 添加一些样式美化 */
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+.badge {
+    font-size: 0.8rem;
+}
+
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+h6 {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+</style>
 {% endblock %} 

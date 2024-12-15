@@ -30,9 +30,59 @@ def init_database():
             db.create_all()
             db.session.commit()
             print("表创建成功！")
-            # 这里未创建视图
             
-            print("数据库初始化完成！，未创建视图")
+            # 创建视图
+            create_view_sql = """
+            CREATE VIEW DocumentDisplayView AS
+            SELECT 
+                d.Doc_id,
+                d.Doc_title,
+                d.Doc_type,
+                d.Doc_summary,
+                d.Doc_image_path,
+                t1.createdData as Doc_time,
+                t1.Standard_createdData as Doc_standardTime,
+                CONCAT(
+                    '《', 
+                    (SELECT p1.Person_name FROM People p1 WHERE p1.Person_id = c.Alice_id),
+                    '》《',
+                    (SELECT p2.Person_name FROM People p2 WHERE p2.Person_id = c.Bob_id),
+                    '》',
+                    CASE 
+                        WHEN r.Relation_type IS NOT NULL THEN CONCAT('（', r.Relation_type, '）')
+                        ELSE ''
+                    END
+                ) as ContractorInfo,
+                GROUP_CONCAT(
+                    CONCAT('《', p.Person_name, '》（', pa.Part_role, '）')
+                    ORDER BY pa.Part_role
+                    SEPARATOR ''
+                ) as ParticipantInfo
+            FROM Documents d
+            LEFT JOIN TimeRecord t1 ON d.Doc_createdTime_id = t1.Time_id
+            LEFT JOIN Contractors c ON d.Doc_id = c.Doc_id
+            LEFT JOIN Relations r ON (r.Alice_id = c.Alice_id AND r.Bob_id = c.Bob_id) 
+                                OR (r.Alice_id = c.Bob_id AND r.Bob_id = c.Alice_id)
+            LEFT JOIN Participants pa ON d.Doc_id = pa.Doc_id
+            LEFT JOIN People p ON pa.Person_id = p.Person_id
+            GROUP BY 
+                d.Doc_id, 
+                d.Doc_title, 
+                d.Doc_type, 
+                d.Doc_summary,
+                d.Doc_image_path, 
+                t1.createdData,
+                t1.Standard_createdData,
+                c.Alice_id,
+                c.Bob_id,
+                r.Relation_type
+            """
+            
+            db.session.execute(text(create_view_sql))
+            db.session.commit()
+            print("视图创建成功！")
+            
+            print("数据库初始化完成！")
             
         except Exception as e:
             print(f"数据库初始化失败: {str(e)}")

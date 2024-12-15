@@ -3,6 +3,7 @@
 {% block title %}添加文书 - 永泰文书{% endblock %}
 
 {% block styles %}
+<link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-bootstrap-4/bootstrap-4.css" rel="stylesheet">
 <style>
     .preview-image {
         max-width: 100%;
@@ -77,6 +78,21 @@
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data" id="documentForm" 
                           class="form-container">
+                        <!-- 在文书图片上传之前添加册号输入 -->
+                        <div class="mb-3">
+                            <label for="doc_id" class="form-label">文书册号</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="doc_id" name="doc_id" 
+                                       placeholder="格式：x-x-x-x（例如：1-1-1-1）" required
+                                       pattern="\d+-\d+-\d+-\d+" title="请输入正确的册号格式：x-x-x-x">
+                                <button class="btn btn-outline-secondary" type="button" onclick="checkDocId()">
+                                    检查册号
+                                </button>
+                            </div>
+                            <div class="form-text text-muted">请输入四组数字，用连字符分隔（例如：1-1-1-1）</div>
+                            <div id="docIdFeedback" class="invalid-feedback"></div>
+                        </div>
+                        
                         <!-- 文书图片上传 -->
                         <div class="mb-3">
                             <label for="document_image" class="form-label">文书图片</label>
@@ -124,6 +140,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 // 图片预览功能
 document.getElementById('document_image').addEventListener('change', function(e) {
@@ -140,34 +157,67 @@ document.getElementById('document_image').addEventListener('change', function(e)
 });
 
 // 表单提交处理
-document.getElementById('documentForm').addEventListener('submit', function(e) {
-    const loadingOverlay = document.getElementById('loadingOverlay');
+document.getElementById('documentForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // 先检查册号
+    const isDocIdValid = await checkDocId();
+    if (!isDocIdValid) {
+        return;
+    }
+    
+    // 其他验证...
     const textArea = document.getElementById('document_text');
     const imageInput = document.getElementById('document_image');
     
-    // 表单验证
     if (!textArea.value.trim()) {
-        e.preventDefault();
         alert('请输入文书文本');
         return;
     }
     
     if (!imageInput.files || !imageInput.files[0]) {
-        e.preventDefault();
         alert('请选择文书图片');
         return;
     }
     
     // 显示加载遮罩
-    loadingOverlay.style.display = 'block';
-
-    // 添加超时处理
-    setTimeout(function() {
-        if (loadingOverlay.style.display === 'block') {
-            loadingOverlay.style.display = 'none';
-            alert('处理超时，请重试');
+    document.getElementById('loadingOverlay').style.display = 'block';
+    
+    try {
+        // 创建 FormData 对象
+        const formData = new FormData(this);
+        
+        // 发送请求
+        const response = await fetch('/user/add_document', {
+            method: 'POST',
+            body: formData
+        });
+        
+        // 隐藏加载遮罩
+        document.getElementById('loadingOverlay').style.display = 'none';
+        
+        if (response.redirected) {
+            // 如果是重定向到管理页面，说明添加成功
+            Swal.fire({
+                title: '成功！',
+                text: '文书添加成功',
+                icon: 'success',
+                confirmButtonText: '确定'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = response.url;
+                }
+            });
+        } else {
+            // 如果不是重定向，说明有错误，刷新页面显示错误信息
+            window.location.reload();
         }
-    }, 30000); // 30秒超时
+    } catch (error) {
+        // 隐藏加载遮罩
+        document.getElementById('loadingOverlay').style.display = 'none';
+        console.error('提交表单时出错:', error);
+        alert('提交表单时出错，请重试');
+    }
 });
 
 // 添加错误提示自动消失
@@ -186,5 +236,48 @@ document.querySelectorAll('.alert .btn-close').forEach(button => {
         this.closest('.alert').remove();
     });
 });
+
+// 在现有的 script 标签中添加以下函数
+async function checkDocId() {
+    const docId = document.getElementById('doc_id').value;
+    const docIdInput = document.getElementById('doc_id');
+    const feedback = document.getElementById('docIdFeedback');
+    
+    // 验证格式
+    const pattern = /^\d+-\d+-\d+-\d+$/;
+    if (!pattern.test(docId)) {
+        docIdInput.classList.add('is-invalid');
+        feedback.textContent = '册号格式不正确，请使用 x-x-x-x 格式';
+        return false;
+    }
+    
+    try {
+        const response = await fetch('/user/check_doc_id', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ doc_id: docId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.exists) {
+            docIdInput.classList.add('is-invalid');
+            feedback.textContent = '该册号已存在，请重新输入';
+            return false;
+        } else {
+            docIdInput.classList.remove('is-invalid');
+            docIdInput.classList.add('is-valid');
+            feedback.textContent = '';
+            return true;
+        }
+    } catch (error) {
+        console.error('检查册号时出错:', error);
+        docIdInput.classList.add('is-invalid');
+        feedback.textContent = '检查册号时出错，请重试';
+        return false;
+    }
+}
 </script>
 {% endblock %} 
