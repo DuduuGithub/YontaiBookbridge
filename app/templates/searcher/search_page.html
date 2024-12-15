@@ -593,14 +593,40 @@ document.addEventListener('DOMContentLoaded', function() {
     const showAdvancedSearchBtn = document.getElementById('showAdvancedSearch');
     const backToBasicSearchBtn = document.getElementById('backToBasicSearch');
     
+    // 切换到精细搜索
     showAdvancedSearchBtn.addEventListener('click', function() {
         basicSearchPanel.style.display = 'none';
         advancedSearchPanel.style.display = 'block';
+        // 清空精��搜索的输入框
+        document.getElementById('personSearch').value = '';
+        document.getElementById('titleSearch').value = '';
+        document.getElementById('contentSearch').value = '';
+        // 重新加载所有文书
+        performAdvancedSearch({
+            type: 'advanced',
+            person: '',
+            title: '',
+            content: '',
+            page: 1
+        });
     });
     
+    // 返回普通搜索
     backToBasicSearchBtn.addEventListener('click', function() {
         advancedSearchPanel.style.display = 'none';
         basicSearchPanel.style.display = 'block';
+        // 清空普通搜索的输入框
+        document.getElementById('searchInput').value = '';
+        // 重置筛选条件
+        document.getElementById('startEra').value = '';
+        document.getElementById('startYear').value = '';
+        document.getElementById('startMonth').value = '';
+        document.getElementById('endEra').value = '';
+        document.getElementById('endYear').value = '';
+        document.getElementById('endMonth').value = '';
+        document.getElementById('documentType').value = '';
+        // 重新加载所有文书
+        performSearch(1);
     });
 
     // 精细搜索提交
@@ -640,18 +666,54 @@ document.addEventListener('DOMContentLoaded', function() {
     filterContent.addEventListener('click', function(event) {
         event.stopPropagation();
     });
+
+    // 添加普通搜索按钮的点击事件监听
+    document.getElementById('searchButton').addEventListener('click', function() {
+        performSearch(1);
+    });
+
+    // 添加搜索框的回车事件监听
+    document.getElementById('searchInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performSearch(1);
+        }
+    });
 });
 
 // 修改搜索函数
 function performSearch(page = 1, filterParams = {}) {
     const keyword = document.getElementById('searchInput').value;
+    const startEra = document.getElementById('startEra').value;
+    const startYear = document.getElementById('startYear').value;
+    const startMonth = document.getElementById('startMonth').value;
+    const endEra = document.getElementById('endEra').value;
+    const endYear = document.getElementById('endYear').value;
+    const endMonth = document.getElementById('endMonth').value;
+    const docType = document.getElementById('documentType').value;
     
+    // 构建起止时间字符串
+    let startDate = '';
+    if (startEra && startYear) {
+        startDate = `${startEra}${startYear}年`;
+        if (startMonth) {
+            startDate += `${startMonth}月`;
+        }
+    }
+    
+    let endDate = '';
+    if (endEra && endYear) {
+        endDate = `${endEra}${endYear}年`;
+        if (endMonth) {
+            endDate += `${endMonth}月`;
+        }
+    }
+
     const searchParams = {
         type: 'basic',
         keyword: keyword,
-        startDate: filterParams.startDate || '',
-        endDate: filterParams.endDate || '',
-        docType: filterParams.docType || '',
+        startDate: startDate,
+        endDate: endDate,
+        docType: docType,
         page: page
     };
 
@@ -697,7 +759,7 @@ function performAdvancedSearch(params) {
     })
     .catch(error => {
         console.error('Advanced search error:', error);
-        alert('搜索出错，请重试');
+        alert('搜索出错，���重试');
     });
 }
 

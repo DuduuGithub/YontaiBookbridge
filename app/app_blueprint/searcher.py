@@ -34,77 +34,78 @@ def search():
         # 构建基础查询
         query = DocumentDisplayView.query
         
-        # 处理时间筛选
-        start_date = data.get('startDate')
-        end_date = data.get('endDate')
-        
-        if start_date:
-            # 转换为公历日期
-            standard_start = convert_to_gregorian(start_date)
-            if standard_start and ':' in standard_start:
-                year, month, day = map(int, standard_start.split(':'))
-                if month == 0:
-                    standard_start = f"{year}-01-01"
-                else:
-                    standard_start = f"{year}-{month:02d}-01"
-                query = query.filter(DocumentDisplayView.Doc_standardTime >= standard_start)
-        
-        if end_date:
-            # 转换为公历日期
-            standard_end = convert_to_gregorian(end_date)
-            if standard_end and ':' in standard_end:
-                year, month, day = map(int, standard_end.split(':'))
-                if month == 0:
-                    standard_end = f"{year}-12-31"
-                else:
-                    standard_end = f"{year}-{month:02d}-31"
-                query = query.filter(DocumentDisplayView.Doc_standardTime <= standard_end)
-        
-        # 处理文书类型筛选
-        doc_type = data.get('docType')
-        if doc_type:
-            # 直接使用 Doc_type 而不是 Doc_category
-            query = query.filter(DocumentDisplayView.Doc_type == doc_type)
-        
         if search_type == 'advanced':
             # 精细搜索
             person = data.get('person', '').strip()
             title = data.get('title', '').strip()
             content = data.get('content', '').strip()
             
-            if person:
-                query = query.filter(
-                    or_(
-                        DocumentDisplayView.ContractorInfo.like(f'%{person}%'),
-                        DocumentDisplayView.ParticipantInfo.like(f'%{person}%')
+            # 只有当提供了搜索条件时才进行筛选
+            if person or title or content:
+                if person:
+                    query = query.filter(
+                        or_(
+                            DocumentDisplayView.ContractorInfo.like(f'%{person}%'),
+                            DocumentDisplayView.ParticipantInfo.like(f'%{person}%')
+                        )
                     )
-                )
-            if title:
-                query = query.filter(DocumentDisplayView.Doc_title.like(f'%{title}%'))
-            if content:
-                # 这里可以调用全文搜索函数
-                content_results = db_context_query(content)
-                content_ids = [doc.Doc_id for doc in content_results]
-                if content_ids:
-                    query = query.filter(DocumentDisplayView.Doc_id.in_(content_ids))
-                else:
-                    return jsonify({
-                        'documents': [],
-                        'total_pages': 0,
-                        'current_page': page
-                    })
+                if title:
+                    query = query.filter(DocumentDisplayView.Doc_title.like(f'%{title}%'))
+                if content:
+                    content_results = db_context_query(content)
+                    content_ids = [doc.Doc_id for doc in content_results]
+                    if content_ids:
+                        query = query.filter(DocumentDisplayView.Doc_id.in_(content_ids))
+                    else:
+                        return jsonify({
+                            'documents': [],
+                            'total_pages': 0,
+                            'current_page': page
+                        })
         else:
             # 基本搜索
             keyword = data.get('keyword', '').strip()
-            if keyword:
-                query = query.filter(
-                    or_(
-                        DocumentDisplayView.Doc_id.like(f'%{keyword}%'),
-                        DocumentDisplayView.Doc_title.like(f'%{keyword}%'),
-                        DocumentDisplayView.ContractorInfo.like(f'%{keyword}%'),
-                        DocumentDisplayView.ParticipantInfo.like(f'%{keyword}%')
+            start_date = data.get('startDate')
+            end_date = data.get('endDate')
+            doc_type = data.get('docType')
+            
+            # 只有当提供了搜索条件时才进行筛选
+            if keyword or start_date or end_date or doc_type:
+                if keyword:
+                    query = query.filter(
+                        or_(
+                            DocumentDisplayView.Doc_id.like(f'%{keyword}%'),
+                            DocumentDisplayView.Doc_title.like(f'%{keyword}%'),
+                            DocumentDisplayView.ContractorInfo.like(f'%{keyword}%'),
+                            DocumentDisplayView.ParticipantInfo.like(f'%{keyword}%')
+                        )
                     )
-                )
+                
+                # 处理时间筛选
+                if start_date:
+                    # 转换为公历日期
+                    standard_start = convert_to_gregorian(start_date)
+                    if standard_start and ':' in standard_start:
+                        year, month, day = map(int, standard_start.split(':'))
+                        if month == 0:
+                            standard_start = f"{year}-01-01"
+                        else:
+                            standard_start = f"{year}-{month:02d}-01"
+                        query = query.filter(DocumentDisplayView.Doc_standardTime >= standard_start)
+                
+                if end_date:
+                    # 转换为公历日期
+                    standard_end = convert_to_gregorian(end_date)
+                    if standard_end and ':' in standard_end:
+                        year, month, day = map(int, standard_end.split(':'))
+                        if month == 0:
+                            standard_end = f"{year}-12-31"
+                        else:
+                            standard_end = f"{year}-{month:02d}-31"
+                        query = query.filter(DocumentDisplayView.Doc_standardTime <= standard_end)
+                
+                if doc_type:
+                    query = query.filter(DocumentDisplayView.Doc_type == doc_type)
         
         # 执行分页查询
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)

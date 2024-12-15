@@ -204,53 +204,68 @@ def db_query_by_conditions(model, conditions: dict):
 def db_context_query(query, doc_type=None, date_from=None, date_to=None):
     """
     实现全文检索，查询文书标题或原文中包含关键字的记录，并支持高级搜索。
-    
-    :param query: 用于全文检索的关键字
-    :param doc_type: （可选）文档类型，用于筛选特定类型的文档
-    :param date_from: （可选）起始日期，用于筛选创建日期晚于此日期的文档
-    :param date_to: （可选）结束日期，用于筛选创建日期早于日期���文档
-    :return: 返回符合条件的文档列表
+    支持部分匹配和多个关键词。
     """
-    
-    # 基本的文检索 SQL 查询
-    sql = text("""
-        SELECT * FROM Documents
-        WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
-        AGAINST(:query IN BOOLEAN MODE)
-    """)
-
-    # 添加文档类型筛选条件（如果提供）
-    if doc_type:
-        sql = sql + text(" AND Doc_type = :doc_type")
-    
-    # 添加日期范围筛选条件（如果提供）
-    if date_from:
-        sql = sql + text(" AND Doc_createdAt >= :date_from")
-    if date_to:
-        sql = sql + text(" AND Doc_createdAt <= :date_to")
-    
-    # 添加排序条件（按匹配程度序）
-    sql = sql + text("""
-        ORDER BY MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) AGAINST(:query) DESC;
-    """)
-
-    # 执行查询
-    params = {'query': query}
-    if doc_type:
-        params['doc_type'] = doc_type
-    if date_from:
-        params['date_from'] = date_from
-    if date_to:
-        params['date_to'] = date_to
-    
-    # 执行 SQL 查询
-    result = db.session.execute(sql, params)
-    
-    # 获取检索到的文书记录
-    documents = result.fetchall()
-    
-    # 返回检索到的结果，列表形式
-    return documents
+    try:
+        # 处理搜索关键词，添加通配符和 + 操作符
+        search_terms = query.split()
+        formatted_query = ' '.join([f'+*{term}*' for term in search_terms])
+        
+        # 构建基本的全文检索 SQL 查询
+        sql = """
+            SELECT Doc_id FROM Documents
+            WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
+            AGAINST(:query IN BOOLEAN MODE)
+            OR Doc_title LIKE :like_query
+            OR Doc_simplifiedText LIKE :like_query
+            OR Doc_originalText LIKE :like_query
+        """
+        
+        params = {
+            'query': formatted_query,
+            'like_query': f'%{query}%'  # 添加 LIKE 查询作为备选
+        }
+        
+        # 添加文档类型筛选条件（如果提供）
+        if doc_type:
+            sql += " AND Doc_type = :doc_type"
+            params['doc_type'] = doc_type
+        
+        # 添加日期范围筛选条件（如果提供）
+        if date_from:
+            sql += " AND Doc_createdAt >= :date_from"
+            params['date_from'] = date_from
+        if date_to:
+            sql += " AND Doc_createdAt <= :date_to"
+            params['date_to'] = date_to
+        
+        # 添加排序条件
+        sql += """ 
+            ORDER BY MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
+            AGAINST(:query IN BOOLEAN MODE) DESC
+        """
+        
+        print(f"Executing search with query: {formatted_query}")
+        print(f"SQL: {sql}")
+        print(f"Params: {params}")
+        
+        # 执行查询获取文档ID
+        result = db.session.execute(text(sql), params)
+        doc_ids = [row[0] for row in result.fetchall()]
+        
+        if not doc_ids:
+            return []
+            
+        # 使用找到的文档ID从 DocumentDisplayView 中获取完整信息
+        display_results = DocumentDisplayView.query.filter(
+            DocumentDisplayView.Doc_id.in_(doc_ids)
+        ).all()
+        
+        return display_results
+        
+    except Exception as e:
+        print(f"全文搜索出错: {str(e)}")
+        return []
 
 
 import opencc
@@ -263,6 +278,9 @@ from Database.model import *
 
 def process_document_text(original_text: str, image_path: str):
     """处理文书文本，返回所有需要的信息"""
+    # 预处理文本：删除所有空格和换行符
+    original_text = ''.join(original_text.split())  # 删除所有空白字符（包括空格、换行符、制表符等）
+    
     # 1. 转换繁简体
     simplified_text = convert_to_simplified(original_text)
     
@@ -303,14 +321,11 @@ def process_document_text(original_text: str, image_path: str):
     else:
         standard_updated_time = None
     
-    # 5. 生成文书ID
-    doc_id = generate_doc_id()  # 需要实现这个函数
-    
-    # 6. 整理返回数据
+    # 5. 整理返回数据
     return {
-        'doc_id': doc_id,
-        'original_text': original_text,
-        'simplified_text': simplified_text,
+        'doc_id': doc_info.get('doc_id', ''),
+        'original_text': original_text,  # 已经去除空格和换行符的原文
+        'simplified_text': simplified_text,  # 简体版本也不含空格和换行符
         'image_path': image_path,
         'title': doc_info['title'],
         'type': doc_info['type'],
@@ -320,9 +335,9 @@ def process_document_text(original_text: str, image_path: str):
         'updated_time': updated_time,
         'standard_updated_time': standard_updated_time,
         'keywords': doc_info['keywords'],
-        'contractors': doc_info['contractors'],  # 现在只包含 name 字段
-        'relation': doc_info.get('relation'),   # 添加关系字段
-        'participants': doc_info['participants'] # 包含 name 和 role 字段
+        'contractors': doc_info['contractors'],
+        'relation': doc_info.get('relation'),
+        'participants': doc_info['participants']
     }
 
 def generate_doc_id():
@@ -374,7 +389,7 @@ def get_document_info(text: str):
         # 构建提示词
         prompt_base = """分析下面这份清代契约文书，提取以下信息：
         1. 文书标题
-        2. 文书类型（借钱契、租赁契、抵押契、赋税契、诉状、判决书、祭祀契约、祠堂契、劳役契、其他）
+        2. 文书类型（借钱契、租赁契、抵押契、赋税契、诉状、判��书、祭祀契约、祠堂契、劳役契、其他）
         3. 文书大意（200字以内）
         4. 签订时间
         5. 更改时间（如果有）
@@ -590,13 +605,13 @@ class TestDocumentProcessing():
                     return False
             
             # 打印提取的信息
-            print("\n提取���文书信息:")
+            print("\n提取文书信息:")
             for key, value in doc_info.items():
                 print(f"{key}: {value}")
             return True
                 
         except Exception as e:
-            print(f"文书信息提取失败: {str(e)}")
+            print(f"���书信息提取失败: {str(e)}")
             return False
 
     def test_process_document_text(self):
