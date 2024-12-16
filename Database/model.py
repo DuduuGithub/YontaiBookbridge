@@ -53,7 +53,7 @@ class Documents(db.Model):
     Doc_simplifiedText = Column(Text)
     Doc_type = Column(Enum('借钱契', '租赁契', '抵押契','赋税契','诉状','判决书','祭祀契约','祠堂契','劳役契','其他'), nullable=False)
     Doc_summary = Column(Text)
-    Doc_image_path = Column(String(255), nullable=False, default='images/document_img/doc_0.jpg')  # 文书图片路径
+    Doc_image_path = Column(String(255), nullable=False, default='images/documentsdoc_img_{doc_id}.jpg')  # 文书图片路径
     
     # 修改外键关系
     Doc_createdTime_id = Column(Integer, 
@@ -196,7 +196,7 @@ class Highlights(db.Model):
     User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 'Users' 表的 User_id
     Highlight_startPosition = Column(Integer, nullable=False)  # 高亮起始位置（字符索引）
     Highlight_endPosition = Column(Integer, nullable=False)  # 高亮结束位置（字符索引）
-    Highlight_color = Column(String(20), default='yellow')  # 高亮颜色，默认为 'yellow'
+    Highlight_color = Column(String(20), default='yellow')  # 高亮颜色，默认������� 'yellow'
     Highlight_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 高亮创建时间，默认为当前时间戳
 
     # 建立索引优化查询
@@ -256,8 +256,8 @@ class AuditLog(db.Model):
     
     Audit_id = Column(Integer, primary_key=True, autoincrement=True)  # 审计记录的唯一标识符
     User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='SET NULL'))  # 外键，关联到 'Users' 表的 User_id
-    Audit_actionType = Column(String(50), nullable=False)  # 操作类型（如创建、更新等）空
-    Audit_actionDescription = Column(Text, nullable=False)  # 操作的详细描述，非空
+    Audit_actionType = Column(String(50), nullable=False)  # 操作类型（如创建、更新等）
+    Audit_actionDescription = Column(Text)  # 操作的详细描述，允许为空
     Audit_targetTable = Column(String(50))  # 被操作的表
     Audit_timestamp = Column(TIMESTAMP, default=func.current_timestamp())  # 操作时间，默认为当前时间戳
     

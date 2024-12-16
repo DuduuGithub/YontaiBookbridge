@@ -1,39 +1,1246 @@
-{% extends "../base.html" %}
+{% extends "base.html" %}
+
+{% block title %}{{ document.Doc_title }} - 永泰文书{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+<style>
+    /* 保留原有的高亮和批注样式 */
+    
+    /* 面包屑导航 */
+    .breadcrumb {
+        padding: 10px 20px;
+        background: #fff;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+
+    /* 主布局 */
+    .page-layout {
+        display: grid;
+        grid-template-columns: 300px 1fr 250px;
+        gap: 20px;
+        padding: 0 20px 20px;
+    }
+
+    /* 左侧图片 */
+    .document-image {
+        position: sticky;
+        top: 20px;
+        background: #fff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        height: 600px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .document-image img {
+        max-width: 100%;
+        max-height: 100%;
+        height: auto;
+        border-radius: 4px;
+        object-fit: contain;
+    }
+
+    /* 中间内容区 */
+    .document-content {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-height: 600px;
+    }
+
+    /* 功能按钮样式 */
+    .content-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        margin-bottom: 20px;
+    }
+
+    .text-switch-group, .action-group {
+        display: flex;
+        gap: 10px;
+    }
+
+    .content-header .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 8px 16px;
+    }
+
+    .content-header .btn i {
+        font-size: 1.1em;
+    }
+
+    .doc-text {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* 右侧导航 */
+    .right-nav {
+        width: 250px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .local-nav {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .local-nav .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        color: #666;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-bottom: 4px;
+    }
+
+    .local-nav .nav-item:hover {
+        background: #f5f5f5;
+        color: #007bff;
+    }
+
+    .local-nav .nav-item.active {
+        background: #e3f2fd;
+        color: #007bff;
+    }
+
+    .local-nav .nav-item i {
+        font-size: 1.1em;
+    }
+
+    .nav-content {
+        padding: 15px;
+        overflow-y: auto;
+    }
+
+    .content-section {
+        display: none;
+    }
+
+    .content-section.active {
+        display: block;
+    }
+
+    .section-title {
+        font-size: 14px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .keyword-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .keyword-tag {
+        background: #f0f2f5;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        color: #666;
+    }
+
+    .relation-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .relation-item {
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .relation-label {
+        color: #666;
+    }
+
+    .relation-name {
+        color: #333;
+    }
+
+    .relation-role {
+        color: #666;
+        font-size: 12px;
+    }
+
+    /* 高亮和批注��式 */
+    .highlight {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 0 1px;
+        border-radius: 2px;
+    }
+
+    .highlight-yellow { background-color: rgba(255, 255, 0, 0.5) !important; }
+    .highlight-green { background-color: rgba(0, 255, 0, 0.4) !important; }
+    .highlight-blue { background-color: rgba(0, 0, 255, 0.3) !important; }
+    .highlight-pink { background-color: rgba(255, 192, 203, 0.5) !important; }
+
+    .annotation {
+        background-color: #e3f2fd;
+        border-bottom: 1px dashed #2196f3;
+        cursor: help;
+    }
+
+    .annotation:hover::after {
+        content: attr(data-annotation);
+        position: absolute;
+        background: white;
+        border: 1px solid #ddd;
+        padding: 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        max-width: 300px;
+        z-index: 1000;
+    }
+
+    /* 工具栏基础样式 */
+    .text-toolbar {
+        display: none;
+        position: absolute;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        padding: 6px;
+        z-index: 1000;
+        user-select: none;
+        white-space: nowrap;
+        line-height: 1;
+    }
+
+    /* 工具栏按钮样式 */
+    .toolbar-btn {
+        width: 32px;
+        height: 32px;
+        padding: 4px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 2px;
+        vertical-align: middle;
+        line-height: 1;
+    }
+
+    .toolbar-btn:hover {
+        background: #f0f0f0;
+    }
+
+    /* 颜色立方体样式 */
+    .color-cube {
+        width: 24px;
+        height: 24px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 2px;
+        padding: 2px;
+    }
+
+    .cube-face {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    /* 批注图标样式 */
+    .annotation-btn {
+        background-color: #f8f9fa;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .annotation-btn i {
+        font-size: 1.2rem;
+        color: #333;
+    }
+
+    .annotation-btn:hover {
+        background-color: #e9ecef;
+    }
+
+    .annotation-btn:hover i {
+        color: #007bff;
+    }
+
+    /* 颜色选择器样式 */
+    .color-picker {
+        display: none;
+        position: absolute;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        padding: 8px;
+        z-index: 1001;
+        white-space: nowrap;
+    }
+
+    .color-option {
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        display: inline-block;
+        margin: 0 4px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 0;
+        outline: none;
+    }
+
+    .color-option:hover {
+        transform: scale(1.1);
+    }
+
+    #documentContent {
+        line-height: 1.8;
+        font-size: 16px;
+        padding: 20px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        min-height: 500px;
+    }
+
+    .keyword-tag {
+        display: inline-block;
+        background: #e9ecef;
+        padding: 2px 8px;
+        border-radius: 12px;
+        margin: 2px;
+        font-size: 0.9em;
+    }
+
+    .note-item, .comment-item {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .note-text, .comment-text {
+        margin-top: 5px;
+        color: #333;
+    }
+
+    .note-time, .comment-time {
+        color: #666;
+        font-size: 12px;
+    }
+
+    /* Toast 样式 */
+    .toast {
+        background: rgba(33, 37, 41, 0.85);
+        backdrop-filter: blur(4px);
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .toast.success {
+        background: rgba(25, 135, 84, 0.85);
+    }
+
+    .toast.error {
+        background: rgba(220, 53, 69, 0.85);
+    }
+
+    .folder-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .folder-item .btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    .folder-item .btn i {
+        font-size: 1.1em;
+    }
+
+    .export-options {
+        padding: 10px;
+    }
+
+    .export-options .form-check {
+        padding: 10px;
+        border-radius: 6px;
+        transition: background-color 0.2s;
+    }
+
+    .export-options .form-check:hover {
+        background-color: #f8f9fa;
+    }
+
+    .export-options .form-check-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .export-options i {
+        font-size: 1.2em;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="document-container my-4">
-    <div class="document-header mb-4">
-        <h2>{{ document.Doc_title }}</h2>
-        <div class="document-meta">
-            <span class="me-3">{{ document.Doc_court }}</span>
-            <span class="me-3">{{ document.Doc_type }}</span>
-            <span>{{ document.Doc_createdAt.strftime('%Y-%m-%d') }}</span>
+<!-- 面包屑导航 -->
+<nav aria-label="breadcrumb" class="breadcrumb">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('home.index') }}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('searcher.index') }}">文书检索</a></li>
+        <li class="breadcrumb-item active">{{ document.Doc_title }}</li>
+    </ol>
+</nav>
+
+<div class="page-layout">
+    <!-- 左侧文书图片 -->
+    <div class="document-image">
+        <img src="{{ url_for('static', filename='images/documents/doc_img_' + document.Doc_id + '.png') }}" alt="文书图片">
+    </div>
+
+    <!-- 中间内容区 -->
+    <div class="document-content">
+        <!-- 功能按钮区 -->
+        <div class="content-header">
+            <div class="text-switch-group">
+                <button class="btn btn-outline-primary" onclick="switchText('original')">
+                    <i class="bi bi-file-text"></i>
+                    繁体
+                </button>
+                <button class="btn btn-outline-primary" onclick="switchText('simplified')">
+                    <i class="bi bi-file-text-fill"></i>
+                    简体
+                </button>
+            </div>
+            <div class="action-group">
+                <button class="btn btn-outline-success" onclick="addToFavorites()">
+                    <i class="bi bi-bookmark-plus"></i>
+                    收藏
+                </button>
+                <button class="btn btn-outline-secondary" onclick="exportDocument()">
+                    <i class="bi bi-download"></i>
+                    导出
+                </button>
+            </div>
+        </div>
+
+        <!-- 文书原文 -->
+        <div class="doc-text">
+            <h5>原文</h5>
+            <div id="documentContent">
+                {{ content|safe }}
+            </div>
+            
+            <!-- 高亮和批注工具栏 -->
+            <div id="textToolbar" class="text-toolbar">
+                <button class="toolbar-btn highlight-btn" title="高亮">
+                    <div class="color-cube">
+                        <div class="cube-face" style="background-color: rgba(255, 255, 0, 0.5);"></div>
+                        <div class="cube-face" style="background-color: rgba(0, 255, 0, 0.4);"></div>
+                        <div class="cube-face" style="background-color: rgba(0, 0, 255, 0.3);"></div>
+                        <div class="cube-face" style="background-color: rgba(255, 192, 203, 0.5);"></div>
+                    </div>
+                </button>
+                <button class="toolbar-btn annotation-btn" onclick="addAnnotation()" title="批注">
+                    <i class="bi bi-chat-right-text"></i>
+                </button>
+            </div>
+
+            <!-- 颜色选择器 -->
+            <div class="color-picker">
+                <button type="button" class="color-option" style="background-color: rgba(255, 255, 0, 0.5);" onclick="addHighlight('yellow')"></button>
+                <button type="button" class="color-option" style="background-color: rgba(0, 255, 0, 0.4);" onclick="addHighlight('green')"></button>
+                <button type="button" class="color-option" style="background-color: rgba(0, 0, 255, 0.3);" onclick="addHighlight('blue')"></button>
+                <button type="button" class="color-option" style="background-color: rgba(255, 192, 203, 0.5);" onclick="addHighlight('pink')"></button>
+            </div>
+        </div>
+
+        <!-- 文书大意 -->
+        <div class="doc-text">
+            <h5>大意</h5>
+            <div id="docSummary">
+                {{ document.Doc_summary }}
+            </div>
         </div>
     </div>
 
-    <div class="document-content">
-        {{ document.Doc_text | safe }}
+    <!-- 右侧导航 -->
+    <div class="right-nav">
+        <!-- 局部导航栏 -->
+        <div class="local-nav">
+            <a href="#info" class="nav-item active">
+                <i class="bi bi-info-circle"></i>
+                关键信息
+            </a>
+            <a href="#comments" class="nav-item">
+                <i class="bi bi-chat-dots"></i>
+                评论区
+            </a>
+            <a href="#notes" class="nav-item">
+                <i class="bi bi-journal-text"></i>
+                笔记
+            </a>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="nav-content">
+            <!-- 关键信息 -->
+            <div id="info" class="content-section active">
+                <div class="info-section">
+                    <h6 class="section-title">关键词</h6>
+                    <div class="keyword-list">
+                        {% for keyword in document.keywords %}
+                        <span class="keyword-tag">{{ keyword.KeyWord_text }}</span>
+                        {% endfor %}
+                    </div>
+                    <h6 class="section-title mt-4">人物关系</h6>
+                    <div class="relation-list">
+                        {% if contractors %}
+                        <div class="relation-item">
+                            <span class="relation-label">当事人：</span>
+                            <span class="relation-name">{{ contractors.ContractorInfo }}</span>
+                            <span class="relation-role">(叔侄)</span>
+                        </div>
+                        {% endif %}
+                        {% if participants %}
+                        <div class="relation-item">
+                            <span class="relation-label">参与人：</span>
+                            <span class="relation-name">{{ participants.ParticipantInfo }}</span>
+                            <span class="relation-role">(见证人)</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 评论区 -->
+            <div id="comments" class="content-section">
+                <div class="comment-input mb-3">
+                    <textarea class="form-control" id="commentContent" rows="3" placeholder="写下你的评论..."></textarea>
+                    <button class="btn btn-sm btn-primary mt-2" onclick="addLocalComment()">发表评论</button>
+                </div>
+                <div id="localCommentsList">
+                    <!-- 评论将通过 JavaScript 动态添加到这里 -->
+                </div>
+            </div>
+
+            <!-- 笔记区 -->
+            <div id="notes" class="content-section">
+                <!-- 添加笔记输入区 -->
+                <div class="note-input mb-3">
+                    <textarea class="form-control" id="noteContent" rows="3" placeholder="写下你的笔记..."></textarea>
+                    <button class="btn btn-sm btn-primary mt-2" onclick="addLocalNote()">保存笔记</button>
+                </div>
+                
+                <!-- 笔记列表 -->
+                <div id="localNotesList">
+                    <!-- 笔记将通过 JavaScript 动态添加到这里 -->
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
-{% block styles %}
-<style>
-.document-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 20px;
-}
+<!-- 添加批注弹窗 -->
+<div class="modal fade" id="annotationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加批注</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="annotationContent" class="form-label">批注内容</label>
+                    <textarea class="form-control" id="annotationContent" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="saveAnnotation">保存批注</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-.document-meta {
-    color: #666;
-    font-size: 0.9rem;
-    margin-top: 10px;
-}
+<!-- 添加 Toast 消息提示容器 -->
+<div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3">
+    <div id="messageToast" class="toast align-items-center text-white border-0" role="alert" aria-live="polite" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <!-- 消息内容将通过 JavaScript 动态插入 -->
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
 
-.document-content {
-    line-height: 1.8;
-    margin-top: 30px;
-}
-</style>
+<!-- 修改收藏弹窗 -->
+<div class="modal fade" id="folderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加到收藏夹</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="folder-list">
+                    <!-- 已有收藏夹列表 -->
+                    {% for folder in folders %}
+                    <div class="folder-item">
+                        <input type="radio" class="btn-check" name="folder" id="folder{{ folder.id }}" value="{{ folder.name }}" {% if loop.first %}checked{% endif %}>
+                        <label class="btn btn-outline-primary w-100 text-start" for="folder{{ folder.id }}">
+                            <i class="bi bi-folder"></i>
+                            {{ folder.name }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                    <!-- 新建收藏夹 -->
+                    <div class="folder-item">
+                        <input type="radio" class="btn-check" name="folder" id="newFolder" value="new">
+                        <label class="btn btn-outline-success w-100 text-start" for="newFolder">
+                            <i class="bi bi-folder-plus"></i>
+                            新建收藏夹
+                        </label>
+                    </div>
+                </div>
+                <!-- 新建收藏夹输入框 -->
+                <div id="newFolderInput" class="mt-3" style="display: none;">
+                    <input type="text" class="form-control" placeholder="输入收藏夹名称">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmAddToFolder()">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 修改导出弹窗 -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">导出文档</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="export-options">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="textType" id="simplified" value="simplified" checked>
+                        <label class="form-check-label" for="simplified">
+                            <i class="bi bi-file-text"></i>
+                            简体版本
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="textType" id="traditional" value="traditional">
+                        <label class="form-check-label" for="traditional">
+                            <i class="bi bi-file-text-fill"></i>
+                            繁体版本
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="includeNotes">
+                        <label class="form-check-label" for="includeNotes">
+                            <i class="bi bi-journal-text"></i>
+                            包含笔记和批注
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmExport()">确认导出</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 保留原有的工具栏、弹窗等... -->
 {% endblock %}
-{% endblock %} 
+
+{% block scripts %}
+<script>
+// 全局变量
+let selectedText = '';
+let selectedRange = null;
+let currentHighlight = null;
+
+// 在面加载时设置全局的 CSRF token
+const csrfToken = '{{ csrf_token() }}';
+
+// 修改文本选择事件处理
+document.addEventListener('selectionchange', function() {
+    const selection = window.getSelection();
+    const toolbar = document.getElementById('textToolbar');
+    selectedText = selection.toString().trim();
+    
+    if (!selectedText || !toolbar) {
+        if (toolbar) {
+            toolbar.style.display = 'none';
+            const colorPicker = document.querySelector('.color-picker');
+            if (colorPicker) colorPicker.style.display = 'none';
+        }
+        return;
+    }
+    
+    selectedRange = selection.getRangeAt(0);
+    const rect = selectedRange.getBoundingClientRect();
+    
+    // 设置工具栏位置
+    const toolbarWidth = 80; // 两个按钮的总宽度
+    toolbar.style.display = 'flex';
+    
+    // 计算位置，使工具栏居中显示在选中文本上方
+    const left = rect.left + (rect.width - toolbarWidth) / 2;
+    const top = rect.top + window.scrollY - 45; // 上移45像素
+    
+    toolbar.style.left = `${Math.max(10, Math.min(left, window.innerWidth - toolbarWidth - 10))}px`;
+    toolbar.style.top = `${Math.max(10, top)}px`;
+});
+
+// 点击文档其他区域时隐藏工具栏和颜色选择器
+document.addEventListener('mousedown', function(e) {
+    const toolbar = document.getElementById('textToolbar');
+    const colorPicker = document.querySelector('.color-picker');
+    
+    // 如果点击的不是工具栏、颜色选择器、高亮区域，也不是选中的文本
+    if (!e.target.closest('#textToolbar') && 
+        !e.target.closest('.color-picker') && 
+        !e.target.closest('.highlight')) {
+        
+        const selection = window.getSelection();
+        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        const clickedNode = e.target;
+        
+        // 检查点击的位置是否在选中的文本范围内
+        if (range && !range.intersectsNode(clickedNode)) {
+            if (toolbar) toolbar.style.display = 'none';
+            if (colorPicker) colorPicker.style.display = 'none';
+            selection.removeAllRanges();
+        }
+    }
+});
+
+// 高亮按钮点击事件
+document.querySelector('.highlight-btn').addEventListener('click', function(e) {
+    const colorPicker = document.querySelector('.color-picker');
+    const rect = this.getBoundingClientRect();
+    
+    if (colorPicker.style.display === 'flex') {
+        colorPicker.style.display = 'none';
+    } else {
+        colorPicker.style.display = 'flex';
+        colorPicker.style.left = `${rect.left}px`;
+        colorPicker.style.top = `${rect.bottom + 5}px`;
+    }
+    
+    e.stopPropagation();
+});
+
+// 改高亮功能的实现
+function addHighlight(color) {
+    if (!selectedRange) {
+        console.log('No selection range found');
+        return;
+    }
+    
+    try {
+        console.log('Adding highlight with color:', color);
+        
+        // 创建高亮元素
+        const span = document.createElement('span');
+        span.className = `highlight highlight-${color}`;
+        
+        // 保存原始选区
+        const range = selectedRange.cloneRange();
+        
+        // 应用高亮
+        range.surroundContents(span);
+        
+        // 检查用户是否登录并保存到数据库
+        fetch('/reader/check_auth')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.authenticated) {
+                // 如果未登录，移除高亮并跳转到登录页面
+                span.outerHTML = span.innerHTML;
+                window.location.href = '/user/login?next=' + window.location.pathname;
+                return;
+            }
+            
+            // 准备数据
+            const highlightData = {
+                doc_id: '{{ document.Doc_id }}',
+                start_offset: getTextOffset(range.startContainer),
+                end_offset: getTextOffset(range.endContainer) + range.toString().length,
+                color: color
+            };
+            
+            console.log('Sending data to server:', highlightData);
+            
+            // 保存到数据库
+            return fetch('/reader/add_highlight', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(highlightData)
+            });
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (!result.success) {
+                console.error('Error saving highlight:', result.error);
+                // 如果保存失败，移除高亮
+                span.outerHTML = span.innerHTML;
+            }
+        })
+        .catch(error => {
+            console.error('Network error:', error);
+            // 如果网络错误，也移除高亮
+            span.outerHTML = span.innerHTML;
+        });
+        
+        // 隐藏工具栏和颜色选择器
+        const toolbar = document.getElementById('textToolbar');
+        const colorPicker = document.querySelector('.color-picker');
+        if (toolbar) toolbar.style.display = 'none';
+        if (colorPicker) colorPicker.style.display = 'none';
+        
+        // 清除选区
+        window.getSelection().removeAllRanges();
+        
+    } catch (e) {
+        console.error('Error adding highlight:', e);
+        alert('添加高亮失败，请重试');
+    }
+}
+
+// 添加批注
+function addAnnotation() {
+    if (!selectedRange) return;
+    
+    // 检查用户是否登录
+    fetch('/reader/check_auth')
+    .then(response => response.json())
+    .then(data => {
+        if (!data.authenticated) {
+            window.location.href = '/user/login?next=' + window.location.pathname;
+            return;
+        }
+        const annotationModal = new bootstrap.Modal(document.getElementById('annotationModal'));
+        annotationModal.show();
+    });
+}
+
+// 保存批注
+document.getElementById('saveAnnotation').onclick = function() {
+    const content = document.getElementById('annotationContent').value;
+    if (!content.trim() || !selectedRange) {
+        showMessage('批注内容不能为空', 'error');
+        return;
+    }
+    
+    const span = document.createElement('span');
+    span.className = 'annotation';
+    span.setAttribute('data-annotation', content);
+    selectedRange.surroundContents(span);
+    
+    const annotationModal = bootstrap.Modal.getInstance(document.getElementById('annotationModal'));
+    annotationModal.hide();
+    document.getElementById('annotationContent').value = '';
+    hideToolbar();
+    
+    showMessage('保存批注成功');
+}
+
+// 获取文本偏移量
+function getTextOffset(node) {
+    const content = document.getElementById('documentContent');
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+    let charCount = 0;
+    
+    while (walker.nextNode()) {
+        if (walker.currentNode === node) {
+            return charCount;
+        }
+        charCount += walker.currentNode.length;
+    }
+    
+    return 0;
+}
+
+// 获取文本范围
+function getTextRange(start, end) {
+    const content = document.getElementById('documentContent');
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+    
+    let charCount = 0;
+    let range;
+    
+    while (walker.nextNode()) {
+        const node = walker.currentNode;
+        
+        if (charCount + node.length >= start && !range) {
+            range = document.createRange();
+            range.setStart(node, start - charCount);
+        }
+        
+        if (charCount + node.length >= end && range) {
+            range.setEnd(node, end - charCount);
+            break;
+        }
+        
+        charCount += node.length;
+    }
+    
+    return range;
+}
+
+// 隐藏工具栏
+function hideToolbar() {
+    document.getElementById('textToolbar').style.display = 'none';
+    selectedRange = null;
+    selectedText = '';
+}
+
+// 加载高亮和批注
+function loadHighlightsAndNotes() {
+    fetch('/reader/check_auth')
+    .then(response => response.json())
+    .then(data => {
+        if (!data.authenticated) {
+            return; // 未登录用户不加载高亮和批注
+        }
+        
+        fetch(`/reader/get_highlights/{{ document.Doc_id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error loading highlights:', data.error);
+                return;
+            }
+            
+            data.highlights.forEach(highlight => {
+                const range = getTextRange(highlight.Highlight_startPosition, highlight.Highlight_endPosition);
+                if (range) {
+                    const span = document.createElement('span');
+                    span.className = `highlight highlight-${highlight.Highlight_color}`;
+                    range.surroundContents(span);
+                }
+            });
+            
+            data.notes.forEach(note => {
+                const range = getTextRange(note.Note_startPosition, note.Note_endPosition);
+                if (range) {
+                    const span = document.createElement('span');
+                    span.className = 'annotation';
+                    span.setAttribute('data-annotation', note.Note_annotationText);
+                    range.surroundContents(span);
+                }
+            });
+        });
+    });
+}
+
+// 简繁体换功能
+function switchText(type) {
+    fetch(`/reader/get_text/{{ document.Doc_id }}/${type}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('documentContent').innerHTML = data.text;
+                // 切换按钮状态
+                document.querySelectorAll('.text-switch .btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                // 重加载高亮和批注
+                loadHighlightsAndNotes();
+            } else {
+                alert('切换失败：' + data.error);
+            }
+        });
+}
+
+// 收藏功能
+function addToFavorites() {
+    const modal = new bootstrap.Modal(document.getElementById('folderModal'));
+    modal.show();
+}
+
+// 监听新建收藏夹选项
+document.getElementById('newFolder').addEventListener('change', function() {
+    const newFolderInput = document.getElementById('newFolderInput');
+    newFolderInput.style.display = this.checked ? 'block' : 'none';
+});
+
+// 修改收藏功能
+function confirmAddToFolder() {
+    const selectedFolder = document.querySelector('input[name="folder"]:checked');
+    let folderName = '';
+    
+    if (selectedFolder.value === 'new') {
+        folderName = document.querySelector('#newFolderInput input').value.trim();
+        if (!folderName) {
+            showMessage('请输入收藏夹名称', 'error');
+            return;
+        }
+    } else {
+        folderName = selectedFolder.value;
+    }
+    
+    // 模拟保存成功
+    const modal = bootstrap.Modal.getInstance(document.getElementById('folderModal'));
+    modal.hide();
+    showMessage('添加到收藏夹成功');
+}
+
+// 导出功能
+function exportDocument() {
+    const modal = new bootstrap.Modal(document.getElementById('exportModal'));
+    modal.show();
+}
+
+// 修改导出功能
+function confirmExport() {
+    const textType = document.querySelector('input[name="textType"]:checked').value;
+    const includeNotes = document.getElementById('includeNotes').checked;
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+    modal.hide();
+    
+    // 构建导出URL
+    const exportUrl = `/reader/export/${encodeURIComponent('{{ document.Doc_id }}')}/${textType}${includeNotes ? '?notes=1' : ''}`;
+    window.open(exportUrl, '_blank');
+    showMessage('开始下载文档');
+}
+
+// 本地保存笔记
+function addLocalNote() {
+    const noteContent = document.getElementById('noteContent').value;
+    if (!noteContent.trim()) {
+        showMessage('笔记内容不能为空', 'error');
+        return;
+    }
+
+    const notesList = document.getElementById('localNotesList');
+    const noteItem = document.createElement('div');
+    noteItem.className = 'note-item';
+    noteItem.innerHTML = `
+        <div class="note-time">${new Date().toLocaleString()}</div>
+        <div class="note-text">${noteContent}</div>
+    `;
+    notesList.insertBefore(noteItem, notesList.firstChild);
+    
+    document.getElementById('noteContent').value = '';
+    showMessage('保存笔记成功');
+}
+
+// 本地保存评论
+function addLocalComment() {
+    const commentContent = document.getElementById('commentContent').value;
+    if (!commentContent.trim()) {
+        showMessage('评论内容不能为空', 'error');
+        return;
+    }
+
+    const commentsList = document.getElementById('localCommentsList');
+    const commentItem = document.createElement('div');
+    commentItem.className = 'comment-item';
+    commentItem.innerHTML = `
+        <div class="comment-time">${new Date().toLocaleString()}</div>
+        <div class="comment-text">${commentContent}</div>
+    `;
+    commentsList.insertBefore(commentItem, commentsList.firstChild);
+    
+    document.getElementById('commentContent').value = '';
+    showMessage('发表评论成功');
+}
+
+// 获取选中文本的辅助函数
+function getSelectedText(start, end) {
+    const content = document.getElementById('documentContent').textContent;
+    return content.substring(start, end);
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    // 确保色选择器初始状态隐藏
+    const colorPicker = document.querySelector('.color-picker');
+    if (colorPicker) colorPicker.style.display = 'none';
+    
+    // 加载已有的高亮和批注
+    loadHighlightsAndNotes();
+});
+
+// 添加笔记功能
+function addNote() {
+    const noteContent = document.getElementById('noteContent').value;
+    if (!noteContent.trim()) {
+        alert('笔记内容不能为空');
+        return;
+    }
+    
+    fetch('/reader/add_note', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            doc_id: '{{ document.Doc_id }}',
+            content: noteContent,
+            start_offset: 0,  // 普通笔记不需要位置信��
+            end_offset: 0
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();  // 刷新面显示新笔记
+        } else {
+            alert('添加笔记失败：' + data.error);
+        }
+    });
+}
+
+let dragTarget = null;
+let offsetX = 0;
+let offsetY = 0;
+
+function initDraggableNote() {
+    const notePopup = document.getElementById('notePopup');
+    const noteHeader = notePopup.querySelector('.note-header');
+    
+    noteHeader.addEventListener('mousedown', startDragging);
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', stopDragging);
+}
+
+function startDragging(e) {
+    dragTarget = document.getElementById('notePopup');
+    const rect = dragTarget.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    dragTarget.style.cursor = 'move';
+}
+
+function drag(e) {
+    if (!dragTarget) return;
+    
+    e.preventDefault();
+    const x = e.clientX - offsetX;
+    const y = e.clientY - offsetY;
+    
+    // 确保不会拖出视窗
+    const maxX = window.innerWidth - dragTarget.offsetWidth;
+    const maxY = window.innerHeight - dragTarget.offsetHeight;
+    
+    dragTarget.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+    dragTarget.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+}
+
+function stopDragging() {
+    if (dragTarget) {
+        dragTarget.style.cursor = 'default';
+        dragTarget = null;
+    }
+}
+
+function showNotePopup(x, y) {
+    const notePopup = document.getElementById('notePopup');
+    notePopup.style.display = 'block';
+    notePopup.style.left = x + 'px';
+    notePopup.style.top = y + 'px';
+    document.getElementById('noteContent').focus();
+}
+
+function closeNotePopup() {
+    document.getElementById('notePopup').style.display = 'none';
+    document.getElementById('noteContent').value = '';
+}
+
+// 页面加载完成后初始化拖拽功能
+document.addEventListener('DOMContentLoaded', function() {
+    initDraggableNote();
+});
+
+document.querySelectorAll('.local-nav .nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        // 移除所有active类
+        document.querySelectorAll('.local-nav .nav-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+        
+        // 添加active类到当前项
+        item.classList.add('active');
+        const targetId = item.getAttribute('href').substring(1);
+        document.getElementById(targetId).classList.add('active');
+    });
+});
+
+// 添加消息提示函数
+function showMessage(message, type = 'success') {
+    const toast = document.getElementById('messageToast');
+    const toastBody = toast.querySelector('.toast-body');
+    
+    // 设置消息内容
+    toastBody.textContent = message;
+    
+    // 设置样式
+    toast.className = 'toast align-items-center text-white border-0';
+    toast.classList.add(type);
+    
+    // 显示 Toast
+    const bsToast = new bootstrap.Toast(toast, {
+        animation: true,
+        autohide: true,
+        delay: 2000
+    });
+    bsToast.show();
+}
+</script>
+{% endblock %}

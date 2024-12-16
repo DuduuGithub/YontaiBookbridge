@@ -95,34 +95,21 @@ def update_profile():
 
 @user_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('user.dashboard'))
-        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         remember = request.form.get('remember', False) == 'on'
         
-        print(f"Login attempt - Username: {username}")
-        
-        # 测试数据库查���
         user = db_one_filter_record(Users, 'User_name', username)
-        print(f"Query result - User found: {user is not None}")
         
-        if user:
-            print(f"User details - ID: {user.User_id}, Role: {user.User_role}")
-            if check_password_hash(user.User_passwordHash, password):
-                print("Password check: Success")
-                login_user(user, remember=remember)
-                next_page = request.args.get('next')
-                if next_page:
-                    return redirect(next_page)
-                return redirect(url_for('user.dashboard'))
-            else:
-                print("Password check: Failed")
-        
-        else:
-            flash('用户名或密码错误', 'danger')
+        if user and check_password_hash(user.User_passwordHash, password):
+            login_user(user, remember=remember)
+            next_page = request.args.get('next')
+            if next_page and next_page != url_for('user.login'):  # 避免重定向循环
+                return redirect(next_page)
+            return redirect(url_for('home.index'))
+            
+        flash('用户名或密码错误', 'danger')
     
     return render_template('user/login.html')
 
@@ -175,7 +162,7 @@ def register():
                 User_email=email,
                 User_passwordHash=generate_password_hash(password),
                 User_role='Member',  # 默认角色
-                avatar_id='1'  # 默���头像
+                avatar_id='1'  # 默认头像
             )
             
             try:
@@ -371,7 +358,7 @@ def add_document():
                     flash(f'数据库操作失败: {str(e)}', 'danger')
                     return redirect(request.url)
             else:
-                flash('不支持的文件���型', 'danger')
+                flash('不支持的文件类型', 'danger')
                 return redirect(request.url)
                 
         except Exception as e:

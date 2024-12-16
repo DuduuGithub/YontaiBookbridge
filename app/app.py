@@ -12,6 +12,7 @@ from Database.config import db
 import Database.config 
 from flask_login import LoginManager
 from sqlalchemy.sql import text
+from flask_wtf.csrf import CSRFProtect
 
 def init_database():
     with app.app_context():
@@ -70,7 +71,7 @@ def init_database():
                 d.Doc_title, 
                 d.Doc_type, 
                 d.Doc_summary,
-                d.Doc_image_path, 
+                d.Doc_image_path,
                 t1.createdData,
                 t1.Standard_createdData,
                 c.Alice_id,
@@ -90,9 +91,11 @@ def init_database():
             raise
 
 def create_admin():
+    """创建管理员账户"""
     with app.app_context():
-        # 检查管理员是否已存在
-        if not Users.query.filter_by(User_name='admin').first():
+        # 检查是否已存在管理员账户
+        admin = Users.query.filter_by(User_role='Admin').first()
+        if not admin:
             admin = Users(
                 User_name='admin',
                 User_passwordHash=generate_password_hash('admin123'),
@@ -110,16 +113,20 @@ def createApp():
     app = Flask(__name__,
                static_folder='static',
                static_url_path='/static')
+               
+    # 初始化 CSRF 保护
+    csrf = CSRFProtect()
+    csrf.init_app(app)
     
     # 加载配置
     app.config.from_object(Database.config)
     
     # 设置密钥
     app.secret_key = os.environ.get('SECRET_KEY', 'dev')
-    
+
     # 初始化数据库
     db.init_app(app)
-    
+
     app.config['SQLALCHEMY_ECHO'] = True
     
     # 添加自定义过滤器
@@ -136,11 +143,11 @@ def createApp():
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = 'user.login'
-    
+
     @login_manager.user_loader
     def load_user(user_id):
         return Users.query.get(int(user_id))
-    
+
     return app
 
 app = createApp()
@@ -157,11 +164,7 @@ def get_folders():
     return jsonify(folders=folders)
 
 if __name__ == '__main__':
-    # 当数据库表结构发生变化时，需要执行一下这个
+    # 当数据库表结构发生变化时，需执行一下这个
     # init_database()
     create_admin()  # 创建管理员账户
     app.run()
-
-
-
-

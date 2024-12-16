@@ -90,15 +90,18 @@
         z-index: 2;
     }
     .doc-summary {
-        font-size: 0.9rem;
-        color: #666;
-        margin-bottom: 0.8rem;
-        line-height: 1.4;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
+        position: relative;
+        height: 3em;  /* 两行文本的高度 */
+        line-height: 1.5em;
         overflow: hidden;
-        text-overflow: ellipsis;
+    }
+    .doc-summary::after {
+        content: "...";
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        padding-left: 40px;
+        background: linear-gradient(to right, transparent, white 50%);
     }
     .doc-info {
         position: relative;
@@ -320,12 +323,29 @@
     .filter-content .btn {
         margin-top: 0.5rem;
     }
+
+    .hover-shadow:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .doc-summary {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
-    <!-- 搜索和筛选区域 -->
+    <!-- 搜索和筛选域 -->
     <div class="search-section">
         <!-- 基本搜索面板 -->
         <div id="basicSearchPanel">
@@ -437,16 +457,21 @@
 
                 <!-- 搜索框 -->
                 <div class="col">
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="searchInput" 
-                               placeholder="搜索册号、标题、契约人或参与人...">
-                        <button class="btn btn-primary" type="button" id="searchButton">
-                            <i class="fas fa-search"></i> 搜索
-                        </button>
-                        <button class="btn btn-outline-primary" type="button" id="showAdvancedSearch">
-                            <i class="fas fa-search-plus"></i> 精细检索
-                        </button>
-                    </div>
+                    <form method="POST" action="{{ url_for('searcher.search') }}">
+                        <!-- 添加 CSRF token -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="searchInput" name="query"
+                                   placeholder="搜索册��、标题、契约人或参与人...">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-search"></i> 搜索
+                            </button>
+                            <button class="btn btn-outline-primary" type="button" id="showAdvancedSearch">
+                                <i class="fas fa-search-plus"></i> 精细检索
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -465,7 +490,7 @@
                         <div class="col-md-6">
                             <label class="form-label">契约人/参与人</label>
                             <input type="text" class="form-control" id="personSearch" 
-                                   placeholder="输入契约人或参与人姓名">
+                                   placeholder="输入契约人或参与人姓">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">文书标题</label>
@@ -549,7 +574,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('endYear')
     );
 
-    // 修改筛选应用按钮的处理
+    // 修改筛选应用的处理
     document.getElementById('applyFilter').addEventListener('click', async function() {
         // 获取起始时间
         const startEra = document.getElementById('startEra').value;
@@ -597,7 +622,7 @@ document.addEventListener('DOMContentLoaded', function() {
     showAdvancedSearchBtn.addEventListener('click', function() {
         basicSearchPanel.style.display = 'none';
         advancedSearchPanel.style.display = 'block';
-        // 清空精��搜索的输入框
+        // 清空精细搜索的输入框
         document.getElementById('personSearch').value = '';
         document.getElementById('titleSearch').value = '';
         document.getElementById('contentSearch').value = '';
@@ -694,7 +719,7 @@ function performSearch(page = 1, filterParams = {}) {
     // 构建起止时间字符串
     let startDate = '';
     if (startEra && startYear) {
-        startDate = `${startEra}${startYear}年`;
+        startDate = `${startEra}${startYear}��`;
         if (startMonth) {
             startDate += `${startMonth}月`;
         }
@@ -722,8 +747,10 @@ function performSearch(page = 1, filterParams = {}) {
     fetch('/searcher/search', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
         },
+        credentials: 'same-origin',
         body: JSON.stringify(searchParams)
     })
     .then(response => response.json())
@@ -739,15 +766,17 @@ function performSearch(page = 1, filterParams = {}) {
     });
 }
 
-// 修改精细搜索函数
+// 改精细搜索函数
 function performAdvancedSearch(params) {
     console.log('Performing advanced search with params:', params);
     
     fetch('/searcher/search', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
         },
+        credentials: 'same-origin',
         body: JSON.stringify(params)
     })
     .then(response => response.json())
@@ -759,7 +788,7 @@ function performAdvancedSearch(params) {
     })
     .catch(error => {
         console.error('Advanced search error:', error);
-        alert('搜索出错，���重试');
+        alert('搜索出错，请重试');
     });
 }
 
@@ -779,35 +808,37 @@ function updateDocumentList(documents) {
             .join('');
         
         col.innerHTML = `
-            <div class="document-card">
-                <span class="doc-id">${doc.doc_id}</span>
-                
-                <div class="doc-header">
-                    <h3 class="doc-title">${doc.title}</h3>
-                </div>
-                
-                <div class="doc-summary">
-                    ${doc.summary || '暂无文书大意'}
-                </div>
-                
-                <div class="doc-info">
-                    <div class="contractors-section">
-                        <div class="info-group">
-                            <h6>契约人：</h6>
-                            <p>${doc.contractors || '无'}</p>
-                        </div>
+            <a href="/reader/document/${doc.doc_id}" class="text-decoration-none">
+                <div class="document-card hover-shadow">
+                    <span class="doc-id">${doc.doc_id}</span>
+                    
+                    <div class="doc-header">
+                        <h3 class="doc-title">${doc.title}</h3>
                     </div>
-                    <div class="participants-section">
-                        <div class="info-group">
-                            <h6>参与人：</h6>
-                            <div class="participant-tags">
-                                ${participantTags || '<span class="text-muted">无</span>'}
+                    
+                    <div class="doc-summary">
+                        ${doc.summary || '暂无文书大意'}
+                    </div>
+                    
+                    <div class="doc-info">
+                        <div class="contractors-section">
+                            <div class="info-group">
+                                <h6>契约人：</h6>
+                                <p>${doc.contractors || '无'}</p>
                             </div>
                         </div>
+                        <div class="participants-section">
+                            <div class="info-group">
+                                <h6>参与人：</h6>
+                                <div class="participant-tags">
+                                    ${participantTags || '<span class="text-muted">无</span>'}
+                                </div>
+                            </div>
+                        </div>
+                        <span class="doc-type">${doc.type || '其他'}</span>
                     </div>
-                    <span class="doc-type">${doc.type || '其他'}</span>
                 </div>
-            </div>
+            </a>
         `;
         container.appendChild(col);
     });
