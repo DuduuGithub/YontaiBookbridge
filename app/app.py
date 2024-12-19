@@ -96,9 +96,11 @@ def create_admin():
         # 检查是否已存在管理员账户
         admin = Users.query.filter_by(User_role='Admin').first()
         if not admin:
+            # 使用 werkzeug.security 中的 generate_password_hash 来哈希密码
+            password_hash = generate_password_hash('admin123')
             admin = Users(
                 User_name='admin',
-                User_passwordHash=generate_password_hash('admin123'),
+                User_passwordHash=password_hash,  # 存储哈希后的密码
                 User_email='admin@example.com',
                 User_role='Admin',
                 avatar_id='1'
@@ -107,6 +109,11 @@ def create_admin():
             db.session.commit()
             print("管理员账户创建成功")
         else:
+            # 如果管理员已存在但密码是明文，更新为哈希值
+            if admin.User_passwordHash == 'admin123':  # 检查是否是明文密码
+                admin.User_passwordHash = generate_password_hash('admin123')
+                db.session.commit()
+                print("管理员密码已更新为哈希值")
             print("管理员账户已存在")
 
 def createApp():

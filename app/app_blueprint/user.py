@@ -87,10 +87,27 @@ def update_profile():
     if new_password:
         update_data['User_passwordHash'] = generate_password_hash(new_password)
     
-    # 更新数据库
-    db_update_key(Users, current_user.User_id, **update_data)
+    try:
+        # 更新数据库
+        db_update_key(Users, current_user.User_id, **update_data)
+        # 记录审计日志，添加更详细的描述
+        changes = []
+        if 'User_name' in update_data:
+            changes.append('用户名')
+        if 'User_email' in update_data:
+            changes.append('邮箱')
+        if 'User_passwordHash' in update_data:
+            changes.append('密码')
+        if 'avatar_id' in update_data:
+            changes.append('头像')
+            
+        change_desc = '、'.join(changes)
+        log_audit('Update', 'Users', 
+                 f'用户 {current_user.User_name} 更新了个人信息: {change_desc}')
+        flash('个人信息更新成功！', 'success')
+    except Exception as e:
+        flash('更新失败，请稍后重试', 'danger')
     
-    flash('个人信息更新成功！', 'success')
     return redirect(url_for('user.dashboard'))
 
 @user_bp.route('/login', methods=['GET', 'POST'])
@@ -102,13 +119,22 @@ def login():
         
         user = db_one_filter_record(Users, 'User_name', username)
         
-        if user and check_password_hash(user.User_passwordHash, password):
+        if not user:
+            flash('用户名或密码错误', 'danger')
+            return render_template('user/login.html')
+        
+        # 验证密码
+        is_valid = check_password_hash(user.User_passwordHash, password)
+        
+        if is_valid:
             login_user(user, remember=remember)
+            # 记录登录日志
+            log_audit('Login', 'Users', f'用户 {username} 登录系统')
             next_page = request.args.get('next')
-            if next_page and next_page != url_for('user.login'):  # 避免重定向循环
+            if next_page and next_page != url_for('user.login'):
                 return redirect(next_page)
             return redirect(url_for('home.index'))
-            
+        
         flash('用户名或密码错误', 'danger')
     
     return render_template('user/login.html')
@@ -120,11 +146,11 @@ def validate_password(password):
     return True, ""
 
 def validate_username(username):
-    """验证用名"""
+    """验证用户名"""
     if len(username) < 3 or len(username) > 20:
         return False, "用户名长度必须在3-20个字符之间"
     if not username.isalnum():
-        return False, "用户名不能包含字母和数字"
+        return False, "用户名只能包含字母和数字"
     return True, ""
 
 @user_bp.route('/register', methods=['GET', 'POST'])
@@ -134,10 +160,23 @@ def register():
         
     if request.method == 'POST':
         try:
+            # 打印接收到的表单数据（去除密码）
+            form_data = request.form.copy()
+            if 'password' in form_data:
+                form_data['password'] = '***'
+            if 'confirm_password' in form_data:
+                form_data['confirm_password'] = '***'
+            print(f"接收到的注册单数据: {form_data}")
+            
             username = request.form.get('username')
             email = request.form.get('email')
             password = request.form.get('password')
             confirm_password = request.form.get('confirm_password')
+            
+            # 基本验证
+            if not all([username, email, password, confirm_password]):
+                flash('所有字段都必须填写', 'danger')
+                return render_template('user/register.html')
             
             # 验证用户输入
             if password != confirm_password:
@@ -156,18 +195,29 @@ def register():
                 flash(msg, 'danger')
                 return render_template('user/register.html')
             
+            # 验证邮箱格式
+            if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+                flash('邮箱格式不正确', 'danger')
+                return render_template('user/register.html')
+            
+            # 打印密码哈希（仅用于调试）
+            password_hash = generate_password_hash(password)
+            print(f"生成的密码哈希: {password_hash}")
+            
             # 创建新用户
             new_user = Users(
                 User_name=username,
                 User_email=email,
-                User_passwordHash=generate_password_hash(password),
-                User_role='Member',  # 默认角色
-                avatar_id='1'  # 默认头像
+                User_passwordHash=password_hash,
+                User_role='Member',
+                avatar_id='1'
             )
             
             try:
                 db.session.add(new_user)
                 db.session.commit()
+                # 记录审计日志
+                log_audit('Insert', 'Users', f'新用户注册: {username}')
                 flash('注册成功！请登录', 'success')
                 return redirect(url_for('user.login'))
             except Exception as e:
@@ -186,7 +236,7 @@ def register():
                 
         except Exception as e:
             print(f"注册过程错误: {str(e)}")
-            flash('注册失败，请稍重试', 'danger')
+            flash('注册失败，请稍后重试', 'danger')
             return render_template('user/register.html')
             
     return render_template('user/register.html')
@@ -194,6 +244,9 @@ def register():
 @user_bp.route('/logout')
 @login_required
 def logout():
+    username = current_user.User_name
+    # 记录登出日志
+    log_audit('Logout', 'Users', f'用户 {username} 退出系统')
     logout_user()
     return redirect(url_for('home.index'))
 
@@ -264,9 +317,43 @@ def search_documents():
 @admin_required
 def view_logs():
     """查看系统日志"""
-    # 从 AuditLog 表中获取日志记录
-    logs = AuditLog.query.order_by(AuditLog.Audit_timestamp.desc()).all()
-    return render_template('user/view_logs.html', logs=logs)
+    # 获取分页参数
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    # 获取筛选参数
+    action_type = request.args.get('action_type', '')
+    target_table = request.args.get('target_table', '')
+    
+    # 构建查询
+    query = AuditLog.query.order_by(AuditLog.Audit_timestamp.desc())
+    
+    # 应用筛选
+    if action_type:
+        query = query.filter(AuditLog.Audit_actionType == action_type)
+    if target_table:
+        query = query.filter(AuditLog.Audit_targetTable == target_table)
+    
+    # 执行分页查询
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    logs = pagination.items
+    
+    # 获取所有可能的操作类型和目标表（用于筛选下拉框）
+    action_types = db.session.query(AuditLog.Audit_actionType.distinct()).all()
+    action_types = [t[0] for t in action_types]
+    
+    target_tables = db.session.query(AuditLog.Audit_targetTable.distinct()).all()
+    target_tables = [t[0] for t in target_tables]
+    
+    return render_template('user/view_logs.html',
+                         logs=logs,
+                         pagination=pagination,
+                         page=page,
+                         per_page=per_page,
+                         action_types=action_types,
+                         target_tables=target_tables,
+                         current_action_type=action_type,
+                         current_target_table=target_table)
 
 # 允许的图片文件扩展名
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -348,6 +435,9 @@ def add_document():
                     success, message = insert_document(doc_info)
                     print(f"数据库操作结果: success={success}, message={message}")
                     if success:
+                        # 记录审计日志，添加更多详细信息
+                        log_audit('Insert', 'Documents', 
+                                 f'管理员 {current_user.User_name} 添加了新文档: {doc_id}, 标题: {doc_info.get("title", "未知")}')
                         flash('文书添加成功', 'success')
                         return redirect(url_for('user.manage_documents'))
                     else:
@@ -393,4 +483,27 @@ def check_doc_id():
         return jsonify({'error': str(e)}), 500
 
 # 添加其他必要的路由...
+
+def log_audit(action_type, target_table, description):
+    """
+    记录审计日志
+    
+    Args:
+        action_type: 操作类型 (Insert/Update/Delete)
+        target_table: 目标表名
+        description: 操作描述
+    """
+    try:
+        audit_log = AuditLog(
+            User_id=current_user.User_id if current_user.is_authenticated else None,
+            Audit_timestamp=datetime.now(),
+            Audit_actionType=action_type,
+            Audit_targetTable=target_table,
+            Audit_actionDescription=description
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+    except Exception as e:
+        print(f"记录审计日志失败: {str(e)}")
+        db.session.rollback()
 
