@@ -147,12 +147,10 @@ CREATE TABLE IF NOT EXISTS Notes (
 CREATE TABLE IF NOT EXISTS Folders (
     Folder_id INT AUTO_INCREMENT PRIMARY KEY,  -- 收藏夹序号
     User_id INT NOT NULL,  -- 用户ID
-    Doc_id VARCHAR(20) NOT NULL,  -- 文书ID
     Folder_name VARCHAR(255) NOT NULL,  -- 文件夹名称
+    Remarks VARCHAR(255) DEFAULT NULL,  -- 备注
     Folder_createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 文件夹创建时间
-    FOREIGN KEY (User_id) REFERENCES Users(User_id) ON DELETE CASCADE,
-    FOREIGN KEY (Doc_id) REFERENCES Documents(Doc_id) ON DELETE CASCADE,
-    UNIQUE (User_id, Doc_id, Folder_name)  -- 确保同一用户不能为同一文书创建多个相同名称的文件夹
+    FOREIGN KEY (User_id) REFERENCES Users(User_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -177,7 +175,7 @@ CREATE TABLE IF NOT EXISTS Corrections (
     User_id INT DEFAULT NULL,  -- 外键，关联到 'Users' 表的 User_id
     Correction_text TEXT NOT NULL,  -- 纠错内容
     Correction_createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 纠错提交时间，默认为当前时间戳
-    FOREIGN KEY (Doc_id) REFERENCES Documents(Doc_id) ON DELETE CASCADE,  -- 外键，删除文书时，删除相关纠错记录
+    FOREIGN KEY (Doc_id) REFERENCES Documents(Doc_id) ON DELETE CASCADE,  -- 外键，删除文书时，删���相关纠错记录
     FOREIGN KEY (User_id) REFERENCES Users(User_id) ON DELETE SET NULL  -- 外键，删除用户时，设置纠错记录中的 User_id 为 NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -219,4 +217,18 @@ CREATE TABLE IF NOT EXISTS UserBrowsingHistory (
     FOREIGN KEY (User_id) REFERENCES Users(User_id) ON DELETE CASCADE,  -- 外键，删除用户时级联删除浏览记录
     FOREIGN KEY (Doc_id) REFERENCES Documents(Doc_id) ON DELETE CASCADE,  -- 外键，删除文书时级联删除浏览记录
     INDEX idx_User_id_Doc_id (User_id, Doc_id)  -- 联合索引，提高查询效率
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+-- 18、收藏夹内容表 FolderContents
+CREATE TABLE IF NOT EXISTS FolderContents (
+    Content_id INT AUTO_INCREMENT PRIMARY KEY,  -- 自增主键
+    Folder_id INT NOT NULL,  -- 外键，关联到 Folders 表的 Folder_id
+    Doc_id VARCHAR(20) NOT NULL,  -- 外键，关联到 Documents 表的 Doc_id
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 创建时间
+    FOREIGN KEY (Folder_id) REFERENCES Folders(Folder_id) ON DELETE CASCADE,  -- 外键，删除文件夹时级联删除
+    FOREIGN KEY (Doc_id) REFERENCES Documents(Doc_id) ON DELETE CASCADE,  -- 外键，删除文书时级联删除
+    INDEX idx_Folder_id (Folder_id),  -- 为 Folder_id 添加索引
+    INDEX idx_Doc_id (Doc_id)  -- 为 Doc_id 添加索引
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

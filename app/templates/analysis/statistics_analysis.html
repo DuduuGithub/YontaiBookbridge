@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}永泰文书 - 统计分析{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 标题 -->
+    <h2 class="text-center mb-4">统计分析</h2>
+
+    <!-- 图表区域 -->
+    <div class="row">
+        <div class="col-md-12">
+            <div id="charts-container">
+                <!-- 图表占位符 -->
+                <canvas id="bar-chart" class="mb-4" width="800" height="400"></canvas>
+                <canvas id="pie-chart" width="800" height="400"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导出功能 -->
+    <div class="text-center mt-4">
+        <button class="btn btn-primary" id="export-results">导出统计结果</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 获取URL参数中的 folder_id 和 dimension
+    const urlParams = new URLSearchParams(window.location.search);
+    const folderId = urlParams.get('folder_id');
+    const dimension = urlParams.get('dimension');
+
+    // 检查是否有 folder_id 和 dimension 参数
+    if (!folderId || !dimension) {
+        alert('缺少必要的参数，无法生成统计分析。');
+        return;
+    }
+
+    // 获取统计数据
+    fetch(`/api/get_statistics?folder_id=${folderId}&dimension=${dimension}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 渲染柱状图（Bar Chart）
+                const barCtx = document.getElementById('bar-chart').getContext('2d');
+                new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.bar_chart.labels,
+                        datasets: [{
+                            label: '统计数据',
+                            data: data.bar_chart.values,
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+
+                // 渲染饼图（Pie Chart）
+                const pieCtx = document.getElementById('pie-chart').getContext('2d');
+                new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: data.pie_chart.labels,
+                        datasets: [{
+                            label: '统计数据',
+                            data: data.pie_chart.values,
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.5)',
+                                'rgba(75, 192, 192, 0.5)',
+                                'rgba(255, 206, 86, 0.5)',
+                                'rgba(153, 102, 255, 0.5)',
+                                'rgba(255, 159, 64, 0.5)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            } else {
+                alert('统计数据加载失败：' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('统计数据加载失败：', error);
+            alert('统计数据加载失败，请稍后再试。');
+        });
+
+    // 导出功能
+    document.getElementById('export-results').addEventListener('click', function () {
+        window.location.href = `/api/export_statistics?folder_id=${folderId}&dimension=${dimension}`;
+    });
+});
+</script>
+{% endblock %}

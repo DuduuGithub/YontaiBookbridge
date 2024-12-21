@@ -20,7 +20,12 @@ def index():
 @searcher_bp.route('/search', methods=['POST'])
 def search():
     try:
+        print(111111111111)
+         # 打印请求头和请求体
+        print("Request Headers:", request.headers)
+        print("Request Body:", request.data)  # 打印原始请求体
         data = request.get_json()
+        print(22222222222)
         if not data:
             print("No JSON data received")
             return jsonify({'error': 'No data received'}), 400

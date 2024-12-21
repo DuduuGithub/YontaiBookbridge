@@ -72,95 +72,139 @@
 
 {% block scripts %}
 <script>
-// 页面加载时获取所有文书
-document.addEventListener('DOMContentLoaded', function() {
-    searchDocuments();
-});
-
-// 搜索文书
-function searchDocuments() {
-    const keyword = document.getElementById('searchInput').value;
-    fetch('/user/api/search_documents', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ keyword: keyword })
-    })
-    .then(response => response.json())
-    .then(updateDocumentsList)
-    .catch(error => console.error('Error:', error));
-}
-
-// 更新文书列表
-function updateDocumentsList(documents) {
-    const container = document.getElementById('documentsList');
-    container.innerHTML = '';
-    
-    if (documents.length === 0) {
-        container.innerHTML = `
-            <div class="col-12 text-center text-muted">
-                <p>暂无文书数据</p>
-            </div>
-        `;
-        return;
-    }
-    
-    documents.forEach(doc => {
-        const card = document.createElement('div');
-        card.className = 'col-md-6 col-lg-4';
-        card.innerHTML = `
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h5 class="card-title mb-0">${doc.title}</h5>
-                        <span class="badge bg-secondary">${doc.doc_id}</span>
-                    </div>
-                    
-                    <div class="mb-2">
-                        <small class="text-muted d-block">创建时间：${doc.time}</small>
-                        <small class="text-muted d-block">公历时间：${doc.standard_time || '无'}</small>
-                    </div>
-                    
-                    <div class="mb-2">
-                        <h6 class="mb-1">契约人：</h6>
-                        <p class="mb-0 text-primary">${doc.contractors || '无'}</p>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <h6 class="mb-1">参与人：</h6>
-                        <p class="mb-0 text-success">${doc.participants || '无'}</p>
-                    </div>
-                </div>
-                
-                <div class="card-footer bg-transparent border-top-0">
-                    <div class="d-flex justify-content-end gap-2">
-                        <button class="btn btn-sm btn-primary" onclick="viewDocument('${doc.doc_id}')">
-                            <i class="fas fa-eye"></i> 查看
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteDocument('${doc.doc_id}')">
-                            <i class="fas fa-trash"></i> 删除
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.appendChild(card);
+    // 页面加载时获取所有文书
+    document.addEventListener('DOMContentLoaded', function() {
+        searchDocuments();
     });
-}
-
-// 查看文书详情
-function viewDocument(docId) {
-    window.location.href = `/reader/document/${docId}`;
-}
-
-// 删除文书
-function deleteDocument(docId) {
-    if (confirm('确定要删除这份文书吗？')) {
-        // 实现删除功能
+    
+    // 搜索文书
+    function searchDocuments() {
+        const keyword = document.getElementById('searchInput').value;
+        fetch('/user/api/search_documents', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ keyword: keyword })
+        })
+        .then(response => response.json())
+        .then(updateDocumentsList)
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('加载文书列表失败', 'error');
+        });
     }
-}
-</script>
+    
+    // 更新文书列表
+    function updateDocumentsList(documents) {
+        const container = document.getElementById('documentsList');
+        container.innerHTML = '';
+        
+        if (!documents || documents.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-center text-muted">
+                    <p>暂无文书数据</p>
+                </div>
+            `;
+            return;
+        }
+        
+        documents.forEach(doc => {
+            const card = document.createElement('div');
+            card.className = 'col-md-6 col-lg-4';
+            card.innerHTML = `
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">${doc.title || '无标题'}</h5>
+                            <span class="badge bg-secondary">${doc.doc_id}</span>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted d-block">创建时间：${doc.time || '未知'}</small>
+                            <small class="text-muted d-block">公历时间：${doc.standard_time || '无'}</small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <h6 class="mb-1">契约人：</h6>
+                            <p class="mb-0 text-primary">${doc.contractors || '无'}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6 class="mb-1">参与人：</h6>
+                            <p class="mb-0 text-success">${doc.participants || '无'}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer bg-transparent border-top-0">
+                        <div class="d-flex justify-content-end gap-2">
+                            <button class="btn btn-sm btn-primary" onclick="viewDocument('${doc.doc_id}')">
+                                <i class="fas fa-eye"></i> 查看
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteDocument('${doc.doc_id}')">
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+    
+    // 查看文书详情
+    function viewDocument(docId) {
+        window.location.href = `/reader/document/${docId}`;
+    }
+    
+    // 删除文书
+    function deleteDocument(docId) {
+        if (!confirm('确定要删除这份文书吗？此操作不可恢复。')) {
+            return;
+        }
+        
+        fetch(`/user/api/delete_document/${docId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showMessage('文书删除成功');
+                searchDocuments(); // 重新加载文书列表
+            } else {
+                showMessage(result.error || '删除失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('删除文书失败', 'error');
+        });
+    }
+    
+    // 显示消息提示
+    function showMessage(message, type = 'success') {
+        // 创建提示元素
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+        toast.style.zIndex = '1050';
+        toast.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // 添加到页面
+        document.body.appendChild(toast);
+        
+        // 3秒后自动消失
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+    </script>
 
 <style>
 /* 添加一些样式美化 */

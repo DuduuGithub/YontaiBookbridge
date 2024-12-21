@@ -102,7 +102,7 @@ class DocKeywords(db.Model):
 class People(db.Model):
     __tablename__ = 'People'  # 表名为 'People'
 
-    Person_id = Column(Integer, primary_key=True, autoincrement=True)  # 人物序号，��增主键
+    Person_id = Column(Integer, primary_key=True, autoincrement=True)  # 人物序号，增主键
     Person_name = Column(String(100), nullable=False)  # 人物名称
 
     __table_args__ = (
@@ -173,7 +173,7 @@ class Users(db.Model, UserMixin):
     
     # 关系定义：
     highlights = relationship('Highlights', backref='user', cascade='all, delete-orphan')  # 用户与高亮记录的关联
-    notes = relationship('Notes', backref='user', cascade='all, delete-orphan')  # 用户与批注记录的关联
+    notes = relationship('Notes', backref='user', cascade='all, delete-orphan')  # 用户与批注记���的关联
     folders = relationship('Folders', backref='user', cascade='all, delete-orphan')  # 用户与收藏夹的关联
     corrections = relationship('Corrections', backref='user', cascade='all, delete-orphan')  # 用户与纠错记录的关联
     comments = relationship('Comments', backref='user', cascade='all, delete-orphan')  # 用户与评论记录的关联
@@ -216,7 +216,7 @@ class Notes(db.Model):
     Note_id = Column(Integer, primary_key=True, autoincrement=True)  # 批注记录的序号，自增主
     Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 'Documents' 表的 Doc_id
     User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 'Users' 表的 User_id
-    Note_annotationText = Column(Text, nullable=False)  # 批注内容，非空
+    Note_annotationText = Column(Text, nullable=False)  # ��注内容，非空
     Note_startPosition = Column(Integer, nullable=False)  # 批注起始位置（字符索引）
     Note_endPosition = Column(Integer, nullable=False)  # 批注结束位置（字符索引）
     Note_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 批注创建时间，默认为当前时间戳
@@ -234,16 +234,15 @@ class Notes(db.Model):
 # 收藏夹类：Folders
 class Folders(db.Model):
     __tablename__ = 'Folders'  # 表名为 'Folders'
-    
-    Folder_id = Column(Integer, primary_key=True, autoincrement=True)  # 收藏夹的序号，自增主键
-    User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到用户ID
-    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，文书ID
-    Folder_name = Column(String(255), nullable=False)  # 收藏夹名称，非空
-    Folder_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 收藏夹创建时间，默认为当前时间戳
 
-    # 确��同一用户不能为同一文书创建多个相同名称的文件夹
+    Folder_id = Column(Integer, primary_key=True, autoincrement=True)  # 收藏夹序号
+    User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='CASCADE'), nullable=False)  # 外键，用户ID
+    Folder_name = Column(String(255), nullable=False)  # 文件夹名称
+    Remarks = Column(String(255), default=None)  # 备注字段
+    Folder_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 文件夹创建时间
+
     __table_args__ = (
-        db.UniqueConstraint('User_id', 'Doc_id', 'Folder_name', name='unique_folder_doc'),
+        db.Index('idx_User_id', 'User_id'),  # 为 User_id 创建索引
         {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     )
 
@@ -366,5 +365,63 @@ class DocumentDisplayView(db.Model):
             'contractors': self.ContractorInfo,
             'participants': self.ParticipantInfo
         }
+
+# 新增 FolderContents 表模型
+class FolderContents(db.Model):
+    __tablename__ = 'FolderContents'  # 表名为 'FolderContents'
+
+    Content_id = Column(Integer, primary_key=True, autoincrement=True)  # 自增主键
+    Folder_id = Column(Integer, ForeignKey('Folders.Folder_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 Folders 表的 Folder_id
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，文书ID
+    CreatedAt = Column(TIMESTAMP, default=func.current_timestamp())  # 创建时间
+    
+    
+    __table_args__ = (
+        db.Index('idx_Folder_id', 'Folder_id'),  # 为 Folder_id 创建索引
+        db.Index('idx_Doc_id', 'Doc_id'),  # 为 Doc_id 创建索引
+        {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
+    )
+
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+#新增收藏夹统计视图
+class FolderDocumentStats(db.Model):
+    __tablename__ = 'FolderDocumentStats'
+
+    Folder_id = Column(Integer, primary_key=True)  # 收藏夹ID
+    Folder_name = Column(String)                    # 收藏夹名称
+    Borrow_Contract = Column(Integer)               # 借钱契数量
+    Lease_Contract = Column(Integer)                # 租赁契数量
+    Mortgage_Contract = Column(Integer)             # 抵押契数量
+    Tax_Contract = Column(Integer)                  # 赋税契数量
+    Lawsuit = Column(Integer)                       # 诉状数量
+    Judgement = Column(Integer)                     # 判决书数量
+    Sacrificial_Contract = Column(Integer)          # 祭祀契约数量
+    Ancestral_Hall_Contract = Column(Integer)       # 祠堂契数量
+    Labor_Contract = Column(Integer)                # 劳役契数量
+    Other_Contract = Column(Integer)                # 其他类型数量
+    
+    # 自定义序列化方法，将对象转换为字典
+    def to_dict(self):
+        return {
+            'Folder_id': self.Folder_id,
+            'Folder_name': self.Folder_name,
+            'Borrow_Contract': self.Borrow_Contract,
+            'Lease_Contract': self.Lease_Contract,
+            'Mortgage_Contract': self.Mortgage_Contract,
+            'Tax_Contract': self.Tax_Contract,
+            'Lawsuit': self.Lawsuit,
+            'Judgement': self.Judgement,
+            'Sacrificial_Contract': self.Sacrificial_Contract,
+            'Ancestral_Hall_Contract': self.Ancestral_Hall_Contract,
+            'Labor_Contract': self.Labor_Contract,
+            'Other_Contract': self.Other_Contract
+        }
+        
+     # 删除 `autoload_with`，不需要在这里自动加载表结构
+    __table_args__ = {'extend_existing': True}
 
 print("程序已成功运行")

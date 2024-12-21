@@ -55,6 +55,7 @@
         {% endwith %}
 
         <form method="POST" action="{{ url_for('user.register') }}" id="registerForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-floating">
                 <input type="text" class="form-control" id="username" name="username" 
                        placeholder="用户名" required minlength="3" maxlength="20">

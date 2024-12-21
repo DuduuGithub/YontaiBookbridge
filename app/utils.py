@@ -285,7 +285,7 @@ def process_document_text(original_text: str, image_path: str):
     simplified_text = convert_to_simplified(original_text)
     
     # 2. 调用大模型获取文书信息
-    doc_info = get_document_info(original_text)
+    doc_info = get_document_info(simplified_text)
     
     # 3. 转换创建时间格式
     created_time = doc_info.get('created_time', '')
@@ -325,7 +325,7 @@ def process_document_text(original_text: str, image_path: str):
     return {
         'doc_id': doc_info.get('doc_id', ''),
         'original_text': original_text,  # 已经去除空格和换行符的原文
-        'simplified_text': simplified_text,  # 简体版本也不含空格和换行符
+        'simplified_text': doc_info['simple_text'],  # 断句且再次简体化的简体版本
         'image_path': image_path,
         'title': doc_info['title'],
         'type': doc_info['type'],
@@ -389,7 +389,7 @@ def get_document_info(text: str):
         # 构建提示词
         prompt_base = """分析下面这份清代契约文书，提取以下信息：
         1. 文书标题
-        2. 文书类型（借钱契、租赁契、抵押契、赋税契、诉状、判��书、祭祀契约、祠堂契、劳役契、其他）
+        2. 文书类型（借钱契、租赁契、抵押契、赋税契、诉状、判决书、祭祀契约、祠堂契、劳役契、其他）
         3. 文书大意（200字以内）
         4. 签订时间
         5. 更改时间（如果有）
@@ -397,6 +397,7 @@ def get_document_info(text: str):
         7. 契约双方（两个人的姓名）
         8. 契约双方关系（如叔侄、父子等，如果有）
         9. 参与人及其身份（如见证人、代书等，可能有多人）
+        10.对文书内容进行断句，如果有字体仍为繁体则将其转换为简体，返回断句且再次简体化的文书内容
 
         请用JSON格式返回结果，格式如下：
         {
@@ -414,7 +415,8 @@ def get_document_info(text: str):
             "participants": [
                 {"name": "参与人1姓名", "role": "参与人1身份"},
                 {"name": "参与人2姓名", "role": "参与人2身份"}
-            ]
+            ],
+            "simple_text": "文书内容断句且简体化"
         }
 
         请严格按照上述JSON格式返回结果。以下是文书内容：
@@ -464,7 +466,8 @@ def get_document_info(text: str):
                 'participants': [
                     {'name': '王五', 'role': '见证人'},
                     {'name': '赵六', 'role': '代书'}
-                ]
+                ],
+                'simple_text': '这是一份测试用的文书内容，用于演示系统功能。'
             }
     except Exception as e:
         print(f"调用星火API失败: {e}")

@@ -1,145 +1,131 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>动态人际关系网</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.24.0/cytoscape.min.js"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      position: fixed;
-    }
-    #network {
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    #form {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 9999;
-    }
-  </style>
-</head>
-<body>
-  <div id="form">
-    <form id="formSelect">
-      <label for="folders">选择收藏夹:</label>
-      <select id="folders" name="folders" multiple>
-        <!-- 动态加载收藏夹 -->
-      </select>
-      <button type="submit">生成关系网</button>
-    </form>
-  </div>
-  <div id="network"></div>
+{% extends "base.html" %}
 
-  <script>
-    $(document).ready(function() {
-      // 动态加载收藏夹列表
-      $.ajax({
-        url: '/get_all_folders',  // 向后端请求收藏夹数据
-        type: 'GET',
-        success: (response) => {
-          // 动态加载返回的收藏夹列表
-          response.folders.forEach(folder => {
-            $('#folders').append(new Option(folder, folder));
-          });
-        },
-        error: () => {
-          alert('无法加载收藏夹列表');
-        }
-      });
+{% block title %}永泰文书 - 分析{% endblock %}
 
-      $('#formSelect').on('submit', function(e) {
-        e.preventDefault();
-        const selectedFolders = $('#folders').val();
+{% block content %}
 
-        // 将选中的收藏夹数据发送到后端
-        $.ajax({
-          url: '/generate_graph',
-          type: 'POST',
-          contentType: 'application/json',
-          data: JSON.stringify({ folders: selectedFolders }),
-          success: (response) => {
-            if (response.success) {
-              renderGraph(response.data);
+<div class="container">
+    <div class="row mt-4">
+        <!-- 左侧：关系网络分析 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">关系网络分析</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="network-source">选择数据来源</label>
+                        <select class="form-control" id="network-source">
+                            <option value="">请选择...</option>
+                            <!-- 收藏夹选项由后端动态加载 -->
+                        </select>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label for="network-dimension">分析维度</label>
+                        <select class="form-control" id="network-dimension" disabled>
+                            <option value="relationship" selected>人际关系分析</option>
+                        </select>
+                    </div>
+                    <div class="text-center mt-3">
+                        <button 
+                            class="btn btn-primary" 
+                            id="generate-network"
+                            onclick="generateNetwork()">
+                            生成网络
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：统计分析 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">统计分析</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="stats-source">选择数据来源</label>
+                        <select class="form-control" id="stats-source">
+                            <option value="">请选择...</option>
+                            <!-- 收藏夹选项由后端动态加载 -->
+                        </select>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label for="stats-dimension">选择统计维度</label>
+                        <select class="form-control" id="stats-dimension">
+                            <option value="time">时间维度</option>
+                            <option value="type">类型维度</option>
+                        </select>
+                    </div>
+                    <div class="text-center mt-3">
+                        <button class="btn btn-primary" id="generate-stats">生成统计</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 获取收藏夹列表并填充到选择框
+    fetch('/api/get_folders')  // 使用后端的 `/api/get_folders` 路由
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const folders = data.folders;
+                const networkSelect = document.getElementById('network-source');
+                const statsSelect = document.getElementById('stats-source');
+                
+                folders.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.id;
+                    option.textContent = folder.name;
+                    networkSelect.appendChild(option.cloneNode(true));
+                    statsSelect.appendChild(option);
+                });
             } else {
-              alert('数据格式错误！');
+                alert(`加载收藏夹失败：${data.message}`);
             }
-          },
-          error: () => {
-            alert('网络请求失败！');
-          },
+        })
+        .catch(error => {
+            console.error('获取收藏夹列表失败', error);
+            alert('获取收藏夹列表失败，请稍后重试');
         });
-      });
-    });
 
-    // 渲染人际关系网
-    const renderGraph = (data) => {
-      const cy = cytoscape({
-        container: document.getElementById('network'),
-        elements: {
-          nodes: data.nodes.map(node => ({ data: node })),
-          edges: data.edges.map(edge => ({ data: edge })),
-        },
-        style: [
-          {
-            selector: 'node',
-            style: {
-              'background-color': '#0074D9',
-              'label': 'data(label)',
-              'text-valign': 'center',
-              'color': '#fff',
-            },
-          },
-          {
-            selector: 'edge',
-            style: {
-              'width': 2,
-              'line-color': '#ccc',
-              'target-arrow-color': '#ccc',
-              'target-arrow-shape': 'triangle',
-              'label': 'data(label)',
-              'arrow-scale': 2          // 增加箭头的大小
-            },
-          },
-          {
-            selector: 'edge[directed = "true"]', // 如果边有方向
-            style: {
-              'target-arrow-shape': 'triangle', // 显示箭头
-              'target-arrow-color': '#000',     // 箭头颜色
-              'line-color': '#000'              // 边的颜色
-            }
-          },
-          {
-            selector: 'edge[directed = "false"]', // 如果边无方向
-            style: {
-              'target-arrow-shape': 'none',      // 不显示箭头
-              'line-color': '#ccc'               // 边的颜色
-            }
-          }
-        ],
-        layout: {
-          name: 'cose',
-          animate: false,
-          refresh: 1,
-          componentSpacing: 100,
-          nodeRepulsion: 400000,
-          nodeOverlap: 20,
-          gravity: 80,
-          randomize: false
-        },
-      });
-    };
-  </script>
-</body>
-</html>
+    // 生成网络分析
+    function generateNetwork() {
+        const folderSelect = document.getElementById('network-source');
+        const folderId = folderSelect.value;
+
+        if (!folderId) {
+            alert('请选择数据来源');
+            return;
+        }
+
+        // 跳转到人际关系网络页面，附加 folder_id 参数
+        window.location.href = `/analysis/relationship_network?folder_id=${folderId}`;
+    }
+
+    // 添加到全局（使 generateNetwork 按钮可以调用）
+    window.generateNetwork = generateNetwork;
+
+    // 处理统计生成按钮点击
+    document.getElementById('generate-stats').addEventListener('click', function() {
+        const sourceId = document.getElementById('stats-source').value;
+        const dimension = document.getElementById('stats-dimension').value;
+
+        if (!sourceId) {
+            alert('请选择数据来源');
+            return;
+        }
+
+        // 跳转到统计分析页面，附加参数
+        window.location.href = `/analysis/statistics_analysis?source_id=${sourceId}&dimension=${dimension}`;
+    });
+});
+</script>
+
+{% endblock %}
