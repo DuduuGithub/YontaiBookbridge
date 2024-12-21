@@ -1,6 +1,5 @@
 import sys
 import os
-
 # 将项目根目录添加到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from werkzeug.security import generate_password_hash
