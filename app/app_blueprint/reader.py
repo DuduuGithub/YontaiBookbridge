@@ -350,6 +350,60 @@ def add_comment():
 def add_to_folder():
     try:
         data = request.get_json()
+        data = request.get_json()
+        
+        # 验证必要字段
+        if not data.get('Doc_id') or not data.get('Comment_text'):
+            return jsonify({
+                'success': False,
+                'error': '缺少必要字段'
+            }), 400
+            
+        # 创建评论
+        comment = Comments(
+            Doc_id=data['Doc_id'],
+            User_id=current_user.User_id,
+            Comment_text=data['Comment_text'],
+            Comment_createdAt=datetime.now()
+        )
+        
+        db.session.add(comment)
+        db.session.commit()
+        
+        # 只创建一条用户操作的审计日志
+        create_audit_log(
+            current_user.User_id,
+            'INSERT',
+            f'用户 {current_user.User_name} 在文档 {data["Doc_id"]} 中添加了评论',
+            'Comments',
+            comment.Comment_id
+        )
+        
+        # 返回新评论的完整信息
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': comment.Comment_id,
+                'content': comment.Comment_text,
+                'user_name': current_user.User_name,
+                'created_at': comment.Comment_createdAt.strftime('%Y-%m-%d %H:%M:%S'),
+                'is_mine': True
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"添加评论失败: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@reader_bp.route('/add_to_folder', methods=['POST'])
+@login_required
+def add_to_folder():
+    try:
+        data = request.get_json()
         
         # 验证必要字段
         if not data.get('doc_id') or not data.get('folder_name'):

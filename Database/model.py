@@ -53,7 +53,7 @@ class Documents(db.Model):
     Doc_simplifiedText = Column(Text)
     Doc_type = Column(Enum('借钱契', '租赁契', '抵押契','赋税契','诉状','判决书','祭祀契约','祠堂契','劳役契','其他'), nullable=False)
     Doc_summary = Column(Text)
-    Doc_image_path = Column(String(255), nullable=False, default='images/document_img/doc_0.jpg')  # 文书图片路径
+    Doc_image_path = Column(String(255), nullable=False, default='images/documentsdoc_img_{doc_id}.jpg')  # 文书图片路径
     
     # 修改外键关系
     Doc_createdTime_id = Column(Integer, 
@@ -196,7 +196,7 @@ class Highlights(db.Model):
     User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='CASCADE'), nullable=False)  # 外键，关联到 'Users' 表的 User_id
     Highlight_startPosition = Column(Integer, nullable=False)  # 高亮起始位置（字符索引）
     Highlight_endPosition = Column(Integer, nullable=False)  # 高亮结束位置（字符索引）
-    Highlight_color = Column(String(20), default='yellow')  # 高亮颜色，默认为 'yellow'
+    Highlight_color = Column(String(20), default='yellow')  # 高亮颜色，默认������������� 'yellow'
     Highlight_createdAt = Column(TIMESTAMP, default=func.current_timestamp())  # 高亮创建时间，默认为当前时间戳
 
     # 建立索引优化查询
@@ -246,23 +246,36 @@ class Folders(db.Model):
         {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     )
 
+# 收藏内容类：FolderContent（作为关联表）
+class FolderContent(db.Model):
+    __tablename__ = 'FolderContent'
+    
+    Content_id = Column(Integer, primary_key=True, autoincrement=True)
+    Folder_id = Column(Integer, ForeignKey('Folders.Folder_id', ondelete='CASCADE'), nullable=False)
+    Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)
+    CreatedAt = Column(TIMESTAMP, default=func.current_timestamp())
+
+    __table_args__ = (
+        db.UniqueConstraint('Folder_id', 'Doc_id', name='unique_folder_document'),  # 确保同一文件夹不会重复收藏同一文档
+        db.Index('idx_Folder_id', 'Folder_id'),
+        db.Index('idx_Doc_id', 'Doc_id'),
+        {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
+    ) 
+
 
 
 
 # 审计日志类：AuditLog
 class AuditLog(db.Model):
-    __tablename__ = 'AuditLog'  # 表名为 'AuditLog'
+    __tablename__ = 'AuditLog'
     
-    Audit_id = Column(Integer, primary_key=True, autoincrement=True)  # 审计记录的唯一标识符
-    User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='SET NULL'))  # 外键，关联到 'Users' 表的 User_id
-    Audit_actionType = Column(String(50), nullable=False)  # 操作类型（如创建、更新等）空
-    Audit_actionDescription = Column(Text, nullable=False)  # 操作的详细描述，非空
-    Audit_targetTable = Column(String(50))  # 被操作的表
-    Audit_timestamp = Column(TIMESTAMP, default=func.current_timestamp())  # 操作时间，默认为当前时间戳
+    Audit_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    User_id = db.Column(db.String(20), db.ForeignKey('Users.User_id'), nullable=False)
+    Audit_actionType = db.Column(db.String(50), nullable=False)  # 操作类型
+    Audit_actionDescription = db.Column(db.String(200), nullable=False)  # 操作描述
+    Audit_targetTable = db.Column(db.String(50), nullable=False)
+    Audit_timestamp = db.Column(db.DateTime, nullable=False)  # 操作时间
     
-    __table_args__ = (
-        {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
-    )
 
 
 
@@ -321,7 +334,7 @@ class Evernote(db.Model):
 class UserBrowsingHistory(db.Model):
     __tablename__ = 'UserBrowsingHistory'  # 表名为 'UserBrowsingHistory'
     
-    Browse_id = Column(Integer, primary_key=True, autoincrement=True)  # 浏览记录的序号
+    Browse_id = Column(Integer, primary_key=True, autoincrement=True)  # �����览记录的序号
     User_id = Column(Integer, ForeignKey('Users.User_id', ondelete='CASCADE'), nullable=False)  # 外键，删除用户时级联删除浏览记录
     Doc_id = Column(String(20), ForeignKey('Documents.Doc_id', ondelete='CASCADE'), nullable=False)  # 外键，删除文书时级联删除浏览记录
     Browse_time = Column(TIMESTAMP, default=func.current_timestamp())  # 浏览时间，默认为当前时间戳

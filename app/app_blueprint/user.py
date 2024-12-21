@@ -129,9 +129,6 @@ def update_profile():
 
 @user_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('user.dashboard'))
-        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -141,19 +138,22 @@ def login():
         
         # 测试数据库查询
         user = db_one_filter_record(Users, 'User_name', username)
-        print(f"Query result - User found: {user is not None}")
         
-        if user:
-            print(f"User details - ID: {user.User_id}, Role: {user.User_role}")
-            if check_password_hash(user.User_passwordHash, password):
-                print("Password check: Success")
-                login_user(user, remember=remember)
-                next_page = request.args.get('next')
-                if next_page:
-                    return redirect(next_page)
-                return redirect(url_for('user.dashboard'))
-            else:
-                print("Password check: Failed")
+        if not user:
+            flash('用户名或密码错误', 'danger')
+            return render_template('user/login.html')
+        
+        # 验证密码
+        is_valid = check_password_hash(user.User_passwordHash, password)
+        
+        if is_valid:
+            login_user(user, remember=remember)
+            # 记录登录日志
+            log_audit('Login', 'Users', f'用户 {username} 登录系统')
+            next_page = request.args.get('next')
+            if next_page and next_page != url_for('user.login'):
+                return redirect(next_page)
+            return redirect(url_for('home.index'))
         
         else:
             flash('用户名或密码错误', 'danger')
@@ -183,9 +183,11 @@ def validate_password(password):
 
 def validate_username(username):
     """验证用户名"""
+    """验证用户名"""
     if len(username) < 3 or len(username) > 20:
         return False, "用户名长度必须在3-20个字符之间"
     if not username.isalnum():
+        return False, "用户名只能包含字母和数字"
         return False, "用户名只能包含字母和数字"
     return True, ""
 
@@ -201,6 +203,11 @@ def register():
             email = request.form.get('email')
             password = request.form.get('password')
             confirm_password = request.form.get('confirm_password')
+            
+            # 基本验证
+            if not all([username, email, password, confirm_password]):
+                flash('所有字段都必须填写', 'danger')
+                return render_template('user/register.html')
             
             # 基本验证
             if not all([username, email, password, confirm_password]):
@@ -274,6 +281,9 @@ def register():
 @user_bp.route('/logout')
 @login_required
 def logout():
+    username = current_user.User_name
+    # 记录登出日志
+    log_audit('Logout', 'Users', f'用户 {username} 退出系统')
     username = current_user.User_name
     # 记录登出日志
     log_audit('Logout', 'Users', f'用户 {username} 退出系统')
@@ -485,6 +495,7 @@ def add_document():
                     flash(f'数据库操作失败: {str(e)}', 'danger')
                     return redirect(request.url)
             else:
+                flash('不支持的文件类型', 'danger')
                 flash('不支持的文件类型', 'danger')
                 return redirect(request.url)
                 

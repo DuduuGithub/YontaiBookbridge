@@ -32,6 +32,60 @@ def init_database():
             db.session.commit()
             print("表创建成功！")
             
+<<<<<<< HEAD
+=======
+            # 创建视图
+            create_view_sql = """
+            CREATE VIEW DocumentDisplayView AS
+            SELECT 
+                d.Doc_id,
+                d.Doc_title,
+                d.Doc_type,
+                d.Doc_summary,
+                d.Doc_image_path,
+                t1.createdData as Doc_time,
+                t1.Standard_createdData as Doc_standardTime,
+                CONCAT(
+                    '《', 
+                    (SELECT p1.Person_name FROM People p1 WHERE p1.Person_id = c.Alice_id),
+                    '》《',
+                    (SELECT p2.Person_name FROM People p2 WHERE p2.Person_id = c.Bob_id),
+                    '》',
+                    CASE 
+                        WHEN r.Relation_type IS NOT NULL THEN CONCAT('（', r.Relation_type, '）')
+                        ELSE ''
+                    END
+                ) as ContractorInfo,
+                GROUP_CONCAT(
+                    CONCAT('《', p.Person_name, '》（', pa.Part_role, '）')
+                    ORDER BY pa.Part_role
+                    SEPARATOR ''
+                ) as ParticipantInfo
+            FROM Documents d
+            LEFT JOIN TimeRecord t1 ON d.Doc_createdTime_id = t1.Time_id
+            LEFT JOIN Contractors c ON d.Doc_id = c.Doc_id
+            LEFT JOIN Relations r ON (r.Alice_id = c.Alice_id AND r.Bob_id = c.Bob_id) 
+                                OR (r.Alice_id = c.Bob_id AND r.Bob_id = c.Alice_id)
+            LEFT JOIN Participants pa ON d.Doc_id = pa.Doc_id
+            LEFT JOIN People p ON pa.Person_id = p.Person_id
+            GROUP BY 
+                d.Doc_id, 
+                d.Doc_title, 
+                d.Doc_type, 
+                d.Doc_summary,
+                d.Doc_image_path,
+                t1.createdData,
+                t1.Standard_createdData,
+                c.Alice_id,
+                c.Bob_id,
+                r.Relation_type
+            """
+            
+            db.session.execute(text(create_view_sql))
+            db.session.commit()
+            print("视图创建成功！")
+            
+>>>>>>> 7ba48e2da46a5638e85cdb81abcf6d2b685ea5fb
             print("数据库初始化完成！")
             
         except Exception as e:
@@ -73,13 +127,22 @@ def createApp():
     # 初始化 CSRF 保护
     csrf = CSRFProtect()
     csrf.init_app(app)
+<<<<<<< HEAD
     
     # 设置密钥（确保这个密钥是安全的随机值）
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
+=======
+>>>>>>> 7ba48e2da46a5638e85cdb81abcf6d2b685ea5fb
     
     # 加载配置
     app.config.from_object(Database.config)
     
+<<<<<<< HEAD
+=======
+    # 设置密钥
+    app.secret_key = os.environ.get('SECRET_KEY', 'dev')
+
+>>>>>>> 7ba48e2da46a5638e85cdb81abcf6d2b685ea5fb
     # 初始化数据库
     db.init_app(app)
 
@@ -131,5 +194,9 @@ def get_folders():
 if __name__ == '__main__':
     # 当数据库表结构发生变化时，需执行一下这个
     # init_database()
+<<<<<<< HEAD
     create_admin()  # 创建管理员账
+=======
+    create_admin()  # 创建管理员账户
+>>>>>>> 7ba48e2da46a5638e85cdb81abcf6d2b685ea5fb
     app.run()

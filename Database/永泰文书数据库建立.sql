@@ -153,6 +153,18 @@ CREATE TABLE IF NOT EXISTS Folders (
     FOREIGN KEY (User_id) REFERENCES Users(User_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 13、收藏夹内容类：FolderContent
+CREATE TABLE IF NOT EXISTS FolderContent (
+    Content_id INT AUTO_INCREMENT PRIMARY KEY,  -- 收藏夹内容序号
+    Folder_id INT NOT NULL,  -- 收藏夹ID
+    Doc_id VARCHAR(20) NOT NULL,  -- 文书ID
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 收藏夹内容创建时间
+    FOREIGN KEY (Folder_id) REFERENCES Folders(Folder_id) ON DELETE CASCADE,
+    FOREIGN KEY (Doc_id) REFERENCES Documents(Doc_id) ON DELETE CASCADE,
+    INDEX idx_Folder_id (Folder_id),  -- 为 Folder_id 添加索引
+    INDEX idx_Doc_id (Doc_id)  -- 为 Doc_id 添加索引
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 
 -- 13、审计日志类：AuditLog
@@ -160,7 +172,7 @@ CREATE TABLE IF NOT EXISTS AuditLog (
     Audit_id INT AUTO_INCREMENT PRIMARY KEY,  -- 审计记录的唯一标识符
     User_id INT DEFAULT NULL,  -- 外键，用户ID，允许为空
     Audit_actionType VARCHAR(50) NOT NULL,  -- 操作类型（创建、更新等）
-    Audit_actionDescription TEXT NOT NULL,  -- 操作描述
+    Audit_actionDescription TEXT DEFAULT NULL,  -- 操作描述
     Audit_targetTable VARCHAR(50) DEFAULT NULL,  -- 被操作的表名
     Audit_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 操作时间
     FOREIGN KEY (User_id) REFERENCES Users(User_id) ON DELETE SET NULL  -- 外键约束，删除用户时将 User_id 设置为 NULL

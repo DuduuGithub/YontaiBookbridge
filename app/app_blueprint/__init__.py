@@ -1,18 +1,15 @@
 import os
 import importlib
 from flask import Blueprint
+from .home import home_bp
+from .user import user_bp
+from .reader import reader_bp
+from .analysis import analysis_bp
+from .searcher import searcher_bp
 
 def register_blueprints(app):
-    # 获取当前文件夹下的所有 Python 文件
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    for filename in os.listdir(current_dir):
-        if filename.endswith('.py') and filename != '__init__.py':
-            # 动态导入模块
-            module_name = f"app_blueprint.{filename[:-3]}"
-            module = importlib.import_module(module_name)
-
-            # 检查是否定义了蓝图对象
-            for attr in dir(module):
-                blueprint = getattr(module, attr)
-                if isinstance(blueprint, Blueprint):
-                    app.register_blueprint(blueprint)
+    app.register_blueprint(home_bp, url_prefix='/home')
+    app.register_blueprint(user_bp, url_prefix='/user')
+    app.register_blueprint(reader_bp, url_prefix='/reader')
+    app.register_blueprint(analysis_bp, url_prefix='/analysis')
+    app.register_blueprint(searcher_bp, url_prefix='/searcher')
