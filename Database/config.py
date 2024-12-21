@@ -5,7 +5,7 @@ pymysql.install_as_MySQLdb()
 db = SQLAlchemy()
 
 USERNAME = 'root'
-PASSWORD = 'HYy180231'
+PASSWORD = '123456'
 HOST ='127.0.0.1'
 PORT = '3306'
 DATABASE ='永泰文书'

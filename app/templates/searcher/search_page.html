@@ -457,21 +457,19 @@
 
                 <!-- 搜索框 -->
                 <div class="col">
-                    <form method="POST" action="{{ url_for('searcher.search') }}">
-                        <!-- 添加 CSRF token -->
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="searchInput" name="query"
-                                   placeholder="搜索册��、标题、契约人或参与人...">
-                            <button class="btn btn-primary" type="submit">
-                                <i class="fas fa-search"></i> 搜索
-                            </button>
-                            <button class="btn btn-outline-primary" type="button" id="showAdvancedSearch">
-                                <i class="fas fa-search-plus"></i> 精细检索
-                            </button>
-                        </div>
-                    </form>
+                    <!-- 添加 CSRF token -->
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchInput" name="query"
+                                placeholder="搜索册号、标题、契约人或参与人...">
+                                <button class="btn btn-primary" type="button" id="searchButton">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                        <button class="btn btn-outline-primary" type="button" id="showAdvancedSearch">
+                            <i class="fas fa-search-plus"></i> 精细检索
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -490,7 +488,7 @@
                         <div class="col-md-6">
                             <label class="form-label">契约人/参与人</label>
                             <input type="text" class="form-control" id="personSearch" 
-                                   placeholder="输入契约人或参与人姓">
+                                   placeholder="输入契约人或参与人姓名">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">文书标题</label>
@@ -498,9 +496,9 @@
                                    placeholder="输入文书标题">
                         </div>
                         <div class="col-12">
-                            <label class="form-label">书内容</label>
+                            <label class="form-label">文书内容</label>
                             <textarea class="form-control" id="contentSearch" 
-                                     placeholder="输入文书内容关键词" rows="2"></textarea>
+                                     placeholder="输入文书具体内容" rows="2"></textarea>
                         </div>
                         <div class="col-12">
                             <button class="btn btn-primary w-100" id="advancedSearchSubmit">
@@ -719,7 +717,7 @@ function performSearch(page = 1, filterParams = {}) {
     // 构建起止时间字符串
     let startDate = '';
     if (startEra && startYear) {
-        startDate = `${startEra}${startYear}��`;
+        startDate = `${startEra}${startYear}年`;
         if (startMonth) {
             startDate += `${startMonth}月`;
         }
