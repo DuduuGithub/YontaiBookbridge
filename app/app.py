@@ -32,8 +32,6 @@ def init_database():
             db.session.commit()
             print("表创建成功！")
             
-            print("视图创建成功！")
-            
             print("数据库初始化完成！")
             
         except Exception as e:
