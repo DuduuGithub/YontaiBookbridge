@@ -226,27 +226,66 @@
     </div>
 </div>
 
-<!-- 收藏夹模态框 -->
-<div class="modal fade" id="folderModal" tabindex="-1">
+<!-- 收藏选择模态框 -->
+<div class="modal fade" id="favoriteChoiceModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">添加到收藏夹</h5>
+                <h5 class="modal-title">收藏文书</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-3">
+                    <button class="btn btn-outline-primary" onclick="showExistingFolders()">
+                        <i class="bi bi-folder"></i> 添加到已有收藏夹
+                    </button>
+                    <button class="btn btn-outline-success" onclick="showNewFolderForm()">
+                        <i class="bi bi-folder-plus"></i> 创建新收藏夹
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 选择已有收藏夹模态框 -->
+<div class="modal fade" id="existingFoldersModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">选择收藏夹</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group" id="foldersList">
+                    <!-- 收藏夹列表将通过JavaScript动态加载 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新建收藏夹模态框 -->
+<div class="modal fade" id="newFolderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">创建新收藏夹</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="folderName" class="form-label">收藏夹名称</label>
-                    <input type="text" class="form-control" id="folderName">
+                    <label for="newFolderName" class="form-label">收藏夹名称</label>
+                    <input type="text" class="form-control" id="newFolderName">
                 </div>
                 <div class="mb-3">
-                    <label for="folderRemarks" class="form-label">备注</label>
-                    <textarea class="form-control" id="folderRemarks" rows="3" placeholder="可选"></textarea>
+                    <label for="newFolderRemarks" class="form-label">备注</label>
+                    <textarea class="form-control" id="newFolderRemarks" rows="3" placeholder="可选"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="saveFavorite()">保存</button>
+                <button type="button" class="btn btn-primary" onclick="createNewFolder()">创建</button>
             </div>
         </div>
     </div>
@@ -2014,13 +2053,25 @@ function deleteLocalNote(noteId) {
 
 // 修改收藏功能
 function saveFavorite() {
-    const folderName = document.getElementById('folderName').value.trim();
-    const remarks = document.getElementById('folderRemarks').value.trim();
+    const isNewFolder = document.getElementById('newFolderOption').checked;
+    let folderName;
     
-    if (!folderName) {
-        showMessage('请输入收藏夹名称', 'error');
-        return;
+    if (isNewFolder) {
+        folderName = document.getElementById('folderName').value.trim();
+        if (!folderName) {
+            showMessage('请输入收藏夹名称', 'error');
+            return;
+        }
+    } else {
+        const select = document.getElementById('existingFolders');
+        if (!select.value) {
+            showMessage('请选择收藏夹', 'error');
+            return;
+        }
+        folderName = select.value;
     }
+
+    const remarks = document.getElementById('folderRemarks').value.trim();
 
     fetch('/reader/add_to_folder', {
         method: 'POST',
@@ -2031,7 +2082,7 @@ function saveFavorite() {
         body: JSON.stringify({
             doc_id: '{{ document.Doc_id }}',
             folder_name: folderName,
-            remarks: remarks  // 添加备注字段
+            remarks: remarks
         })
     })
     .then(response => response.json())
@@ -2039,8 +2090,11 @@ function saveFavorite() {
         if (result.success) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('folderModal'));
             modal.hide();
+            
+            // 清空表单
             document.getElementById('folderName').value = '';
-            document.getElementById('folderRemarks').value = '';  // 清空备注
+            document.getElementById('folderRemarks').value = '';
+            
             showMessage('添加到收藏夹成功');
         } else {
             showMessage(result.error || '添加到收藏夹失败', 'error');
@@ -2683,6 +2737,188 @@ function loadCorrections() {
     .catch(error => {
         console.error('Error loading corrections:', error);
         showMessage('加载纠错记录失败', 'error');
+    });
+}
+
+// 加载收藏夹列表
+function loadFolders() {
+    fetch('/reader/get_folders')
+    .then(response => response.json())
+    .then(data => {
+        const select = document.getElementById('existingFolders');
+        select.innerHTML = '';
+        
+        if (data.folders && data.folders.length > 0) {
+            data.folders.forEach(folder => {
+                const option = document.createElement('option');
+                option.value = folder.name;
+                option.textContent = folder.name;
+                select.appendChild(option);
+            });
+        } else {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '暂无收藏夹';
+            option.disabled = true;
+            select.appendChild(option);
+            
+            // 如果没有收藏夹，自动切换到创建新收藏夹
+            document.getElementById('newFolderOption').checked = true;
+            toggleFolderSections();
+        }
+    })
+    .catch(error => {
+        console.error('Error loading folders:', error);
+        showMessage('加载收藏夹失败', 'error');
+    });
+}
+
+// 切换收藏夹表单区域
+function toggleFolderSections() {
+    const isNewFolder = document.getElementById('newFolderOption').checked;
+    document.getElementById('existingFolderSection').style.display = isNewFolder ? 'none' : 'block';
+    document.getElementById('newFolderSection').style.display = isNewFolder ? 'block' : 'none';
+}
+
+// 在打开模态框时加载收藏夹列表
+function addToFavorites() {
+    loadFolders();  // 加载收藏夹列表
+    const modal = new bootstrap.Modal(document.getElementById('folderModal'));
+    modal.show();
+}
+
+// 添加收藏夹选项切换事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    const radioButtons = document.querySelectorAll('input[name="folderOption"]');
+    radioButtons.forEach(radio => {
+        radio.addEventListener('change', toggleFolderSections);
+    });
+});
+
+// 显示收藏选择模态框
+function addToFavorites() {
+    const modal = new bootstrap.Modal(document.getElementById('favoriteChoiceModal'));
+    modal.show();
+}
+
+// 显示已有收藏夹列表
+function showExistingFolders() {
+    // 关闭选择模态框
+    const choiceModal = bootstrap.Modal.getInstance(document.getElementById('favoriteChoiceModal'));
+    choiceModal.hide();
+
+    // 加载并显示收藏夹列表
+    fetch('/reader/get_folders')
+    .then(response => response.json())
+    .then(data => {
+        const foldersList = document.getElementById('foldersList');
+        foldersList.innerHTML = '';
+        
+        if (data.folders && data.folders.length > 0) {
+            data.folders.forEach(folder => {
+                const button = document.createElement('button');
+                button.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                button.innerHTML = `
+                    <span>${folder.name}</span>
+                    <i class="bi bi-chevron-right"></i>
+                `;
+                button.onclick = () => addToExistingFolder(folder.name);
+                foldersList.appendChild(button);
+            });
+        } else {
+            foldersList.innerHTML = '<div class="text-center text-muted p-3">暂无收藏夹</div>';
+        }
+
+        // 显示收藏夹列表模态框
+        const modal = new bootstrap.Modal(document.getElementById('existingFoldersModal'));
+        modal.show();
+    })
+    .catch(error => {
+        console.error('Error loading folders:', error);
+        showMessage('加载收藏夹失败', 'error');
+    });
+}
+
+// 显示新建收藏夹表单
+function showNewFolderForm() {
+    // 关闭选择模态框
+    const choiceModal = bootstrap.Modal.getInstance(document.getElementById('favoriteChoiceModal'));
+    choiceModal.hide();
+
+    // 显示新建收藏夹模态框
+    const modal = new bootstrap.Modal(document.getElementById('newFolderModal'));
+    modal.show();
+}
+
+// 添加到现有收藏夹
+function addToExistingFolder(folderName) {
+    fetch('/reader/add_to_folder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            doc_id: '{{ document.Doc_id }}',
+            folder_name: folderName
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('existingFoldersModal'));
+            modal.hide();
+            showMessage('添加到收藏夹成功');
+        } else {
+            showMessage(result.error || '添加到收藏夹失败', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('添加到收藏夹失败：' + error.message, 'error');
+    });
+}
+
+// 创建新收藏夹
+function createNewFolder() {
+    const folderName = document.getElementById('newFolderName').value.trim();
+    const remarks = document.getElementById('newFolderRemarks').value.trim();
+
+    if (!folderName) {
+        showMessage('请输入收藏夹名称', 'error');
+        return;
+    }
+
+    fetch('/reader/add_to_folder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            doc_id: '{{ document.Doc_id }}',
+            folder_name: folderName,
+            remarks: remarks
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('newFolderModal'));
+            modal.hide();
+            
+            // 清空表单
+            document.getElementById('newFolderName').value = '';
+            document.getElementById('newFolderRemarks').value = '';
+            
+            showMessage('创建收藏夹并添加文书成功');
+        } else {
+            showMessage(result.error || '创建收藏夹失败', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('创建收藏夹失败：' + error.message, 'error');
     });
 }
 </script>
