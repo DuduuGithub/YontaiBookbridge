@@ -553,12 +553,16 @@ def folder_detail(folder_id):
         .join(FolderContents, Documents.Doc_id == FolderContents.Doc_id)
         .filter(FolderContents.Folder_id == folder_id)
         .all())
-    
+    # 获取该收藏夹的文书类型统计信息
+    stats = FolderDocumentStats.query.filter_by(Folder_id=folder_id).first()
+    stats_dict = stats.to_dict() if stats else {}
     return render_template(
         'user/folder_detail.html',
         folder=folder,
-        documents=documents
+        documents=documents,
+        stats=stats_dict  # 将统计数据传递到模板
     )
+
 
 @user_bp.route('/folder/<int:folder_id>/remove_document', methods=['POST'])
 @login_required
