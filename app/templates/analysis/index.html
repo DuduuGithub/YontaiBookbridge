@@ -71,27 +71,42 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 获取收藏夹列表并填充到选择框
-    fetch('/api/get_folders')  // 使用后端的 `/api/get_folders` 路由
-        .then(response => response.json())
+    fetch('/analysis/api/get_folders')  // 使用后端的 `/api/get_folders` 路由
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 const folders = data.folders;
                 const networkSelect = document.getElementById('network-source');
                 const statsSelect = document.getElementById('stats-source');
                 
-                folders.forEach(folder => {
+                if (folders.length === 0) {
+                    // 添加提示选项
                     const option = document.createElement('option');
-                    option.value = folder.id;
-                    option.textContent = folder.name;
+                    option.value = "";
+                    option.textContent = "暂无收藏夹";
                     networkSelect.appendChild(option.cloneNode(true));
                     statsSelect.appendChild(option);
-                });
+                } else {
+                    folders.forEach(folder => {
+                        const option = document.createElement('option');
+                        option.value = folder.id;
+                        option.textContent = folder.name;
+                        networkSelect.appendChild(option.cloneNode(true));
+                        statsSelect.appendChild(option);
+                    });
+                }
             } else {
+                console.error('加载收藏夹失败：', data.message);
                 alert(`加载收藏夹失败：${data.message}`);
             }
         })
         .catch(error => {
-            console.error('获取收藏夹列表失败', error);
+            console.error('获取收藏夹列表失败:', error);
             alert('获取收藏夹列表失败，请稍后重试');
         });
 

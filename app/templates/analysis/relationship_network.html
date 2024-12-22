@@ -16,91 +16,136 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.20.0/cytoscape.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    // 从URL获取folder_id参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const folderId = urlParams.get('folder_id');
+    
+    if (!folderId) {
+        alert('未找到收藏夹ID！');
+        return;
+    }
+
     const cy = cytoscape({
         container: document.getElementById("cy"),
-        elements: [], // 初始时为空，后续通过 AJAX 获取数据
+        elements: [],
         style: [
             {
                 selector: "node",
                 style: {
                     "background-color": "#007bff",
                     "label": "data(label)",
-                    "width": "mapData(size, 10, 50, 20, 50)",
-                    "height": "mapData(size, 10, 50, 20, 50)",
-                    "font-size": 10,
+                    "width": 30,
+                    "height": 30,
+                    "font-size": 12,
                     "text-valign": "center",
-                    "color": "#fff",
+                    "text-halign": "center",
+                    "color": "#000",
+                    "text-outline-width": 2,
+                    "text-outline-color": "#fff"
                 },
             },
             {
                 selector: "edge",
                 style: {
-                    "width": "mapData(weight, 1, 10, 2, 6)",
-                    "line-color": "#ccc",
-                    "target-arrow-color": "#ccc",
-                    "target-arrow-shape": "triangle",
+                    "width": 2,
+                    "line-color": "#666",
+                    "target-arrow-color": "#666",
+                    "target-arrow-shape": function(ele) {
+                        return ele.data('directed') ? "triangle" : "none";
+                    },
                     "curve-style": "bezier",
                     "label": "data(label)",
-                    "font-size": 8,
-                    "color": "#000",
+                    "font-size": 10,
+                    "text-rotation": "autorotate",
+                    "text-margin-y": -10,
+                    "text-background-color": "#fff",
+                    "text-background-opacity": 1,
+                    "text-background-padding": 3
                 },
-            },
-            {
-                selector: ":selected",
-                style: {
-                    "background-color": "#f00",
-                    "line-color": "#f00",
-                    "target-arrow-color": "#f00",
-                    "source-arrow-color": "#f00",
-                },
-            },
+            }
         ],
         layout: {
-            name: "cose", // 默认使用力导向布局
+            name: "cose",
             animate: true,
-        },
+            randomize: true,
+            idealEdgeLength: 100,
+            nodeOverlap: 20,
+            refresh: 20,
+            fit: true,
+            padding: 30,
+            componentSpacing: 100
+        }
     });
 
-    // 从后端获取数据
-    fetch("/analysis/generate_graph", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folder_id: FOLDER_ID }), // 替换为实际的 folder_id
-    })
-        .then((response) => response.json())
-        .then((data) => {
-            if (data.success) {
-                cy.add(data.data.nodes);
-                cy.add(data.data.edges);
-
-                // 根据节点数量调整布局
-                const nodeCount = data.data.nodes.length;
-                const layoutOptions =
-                    nodeCount > 10
-                        ? {
-                              name: "cose",
-                              idealEdgeLength: 100,
-                              nodeOverlap: 20,
-                              animate: true,
-                          }
-                        : {
-                              name: "grid",
-                              fit: true,
-                          };
-
-                cy.layout(layoutOptions).run();
-                cy.fit(); // 自动缩放
-            } else {
-                alert("网络生成失败，请重试！");
+    // 获取网络数据
+    fetch(`/analysis/generate_graph?folder_id=${folderId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // 转换数据格式为 Cytoscape 需要的格式
+                const elements = [];
+                
+                // 添加节点
+                data.data.nodes.forEach(node => {
+                    elements.push({
+                        group: 'nodes',
+                        data: {
+                            id: node.id.toString(),
+                            label: node.label
+                        }
+                    });
+                });
+                
+                // 添加边
+                data.data.edges.forEach(edge => {
+                    elements.push({
+                        group: 'edges',
+                        data: {
+                            source: edge.source.toString(),
+                            target: edge.target.toString(),
+                            label: edge.label,
+                            directed: edge.directed
+                        }
+                    });
+                });
+
+                // 添加元素到图中
+                cy.add(elements);
+                
+                // 运行布局
+                cy.layout({
+                    name: 'cose',
+                    animate: true,
+                    randomize: true,
+                    idealEdgeLength: 100,
+                    nodeOverlap: 20,
+                    refresh: 20,
+                    fit: true,
+                    padding: 30
+                }).run();
+
+                console.log('Network data loaded successfully:', data);
+            } else {
+                console.error('Failed to load network data:', data.message);
+                alert('加载网络数据失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching network data:', error);
+            alert('获取网络数据时发生错误');
         });
 
     // 导出功能
     document.getElementById("export-btn").addEventListener("click", () => {
-        const pngContent = cy.png({ full: true });
+        const pngContent = cy.png({ full: true, scale: 2, quality: 1 });
         const a = document.createElement("a");
         a.href = pngContent;
-        a.download = "network.png";
+        a.download = "relationship_network.png";
         a.click();
     });
 });

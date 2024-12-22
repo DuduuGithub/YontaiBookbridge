@@ -7,50 +7,71 @@
     <!-- 标题 -->
     <h2 class="text-center mb-4">统计分析</h2>
 
-    <!-- 图表区域 -->
+    <!-- 图表区域 - 改为左右布局 -->
     <div class="row">
-        <div class="col-md-12">
-            <div id="charts-container">
-                <!-- 图表占位符 -->
-                <canvas id="bar-chart" class="mb-4" width="800" height="400"></canvas>
-                <canvas id="pie-chart" width="800" height="400"></canvas>
+        <!-- 左侧柱状图 -->
+        <div class="col-md-6">
+            <div class="chart-container" style="position: relative; height: 500px;">
+                <canvas id="bar-chart"></canvas>
+            </div>
+            <div class="text-center mt-2">
+                <button class="btn btn-sm btn-secondary" onclick="exportChart('bar-chart', '文书时间分布')">
+                    导出柱状图
+                </button>
+            </div>
+        </div>
+        
+        <!-- 右侧饼图 -->
+        <div class="col-md-6">
+            <div class="chart-container" style="position: relative; height: 500px;">
+                <canvas id="pie-chart"></canvas>
+            </div>
+            <div class="text-center mt-2">
+                <button class="btn btn-sm btn-secondary" onclick="exportChart('pie-chart', '文书时间分布占比')">
+                    导出饼图
+                </button>
             </div>
         </div>
     </div>
 
     <!-- 导出功能 -->
     <div class="text-center mt-4">
-        <button class="btn btn-primary" id="export-results">导出统计结果</button>
+        <button class="btn btn-primary" id="export-results">导出统计数据</button>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // 获取URL参数中的 folder_id 和 dimension
+    // 获取URL参数
     const urlParams = new URLSearchParams(window.location.search);
-    const folderId = urlParams.get('folder_id');
+    const sourceId = urlParams.get('source_id');
     const dimension = urlParams.get('dimension');
 
-    // 检查是否有 folder_id 和 dimension 参数
-    if (!folderId || !dimension) {
+    // 检查参数
+    if (!sourceId || !dimension) {
         alert('缺少必要的参数，无法生成统计分析。');
         return;
     }
 
     // 获取统计数据
-    fetch(`/api/get_statistics?folder_id=${folderId}&dimension=${dimension}`)
-        .then(response => response.json())
+    fetch(`/analysis/api/get_statistics?folder_id=${sourceId}&dimension=${dimension}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                // 渲染柱状图（Bar Chart）
+                // 渲染柱状图
                 const barCtx = document.getElementById('bar-chart').getContext('2d');
                 new Chart(barCtx, {
                     type: 'bar',
                     data: {
                         labels: data.bar_chart.labels,
                         datasets: [{
-                            label: '统计数据',
+                            label: '文书数量',
                             data: data.bar_chart.values,
                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
                             borderColor: 'rgba(54, 162, 235, 1)',
@@ -60,22 +81,49 @@ document.addEventListener('DOMContentLoaded', function () {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '文书时间分布',
+                                padding: {
+                                    top: 10,
+                                    bottom: 20
+                                }
+                            },
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    padding: 10
+                                }
+                            }
+                        },
                         scales: {
                             y: {
-                                beginAtZero: true
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        },
+                        layout: {
+                            padding: {
+                                left: 10,
+                                right: 10,
+                                top: 0,
+                                bottom: 10
                             }
                         }
                     }
                 });
 
-                // 渲染饼图（Pie Chart）
+                // 渲染饼图
                 const pieCtx = document.getElementById('pie-chart').getContext('2d');
                 new Chart(pieCtx, {
                     type: 'pie',
                     data: {
                         labels: data.pie_chart.labels,
                         datasets: [{
-                            label: '统计数据',
                             data: data.pie_chart.values,
                             backgroundColor: [
                                 'rgba(255, 99, 132, 0.5)',
@@ -83,27 +131,88 @@ document.addEventListener('DOMContentLoaded', function () {
                                 'rgba(255, 206, 86, 0.5)',
                                 'rgba(153, 102, 255, 0.5)',
                                 'rgba(255, 159, 64, 0.5)'
-                            ]
+                            ],
+                            borderColor: [
+                                'rgba(255, 99, 132, 1)',
+                                'rgba(75, 192, 192, 1)',
+                                'rgba(255, 206, 86, 1)',
+                                'rgba(153, 102, 255, 1)',
+                                'rgba(255, 159, 64, 1)'
+                            ],
+                            borderWidth: 1
                         }]
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '文书时间分布占比',
+                                padding: {
+                                    top: 10,
+                                    bottom: 20
+                                }
+                            },
+                            legend: {
+                                position: 'right',
+                                align: 'center',
+                                labels: {
+                                    padding: 10
+                                }
+                            }
+                        },
+                        layout: {
+                            padding: {
+                                left: 10,
+                                right: 30,
+                                top: 0,
+                                bottom: 10
+                            }
+                        }
                     }
                 });
             } else {
+                console.error('Failed to load statistics:', data.error);
                 alert('统计数据加载失败：' + data.error);
             }
         })
         .catch(error => {
-            console.error('统计数据加载失败：', error);
+            console.error('Error loading statistics:', error);
             alert('统计数据加载失败，请稍后再试。');
         });
 
     // 导出功能
     document.getElementById('export-results').addEventListener('click', function () {
-        window.location.href = `/api/export_statistics?folder_id=${folderId}&dimension=${dimension}`;
+        window.location.href = `/analysis/api/export_statistics?source_id=${sourceId}&dimension=${dimension}`;
     });
+});
+
+// 添加单独导出图表的功能
+function exportChart(chartId, filename) {
+    const canvas = document.getElementById(chartId);
+    const image = canvas.toDataURL('image/png', 1.0);
+    const link = document.createElement('a');
+    link.download = `${filename}.png`;
+    link.href = image;
+    link.click();
+}
+
+// 使图表容器可调整大小
+const resizeObserver = new ResizeObserver(entries => {
+    for (let entry of entries) {
+        const canvas = entry.target.querySelector('canvas');
+        if (canvas) {
+            const chart = Chart.getChart(canvas);
+            if (chart) {
+                chart.resize();
+            }
+        }
+    }
+});
+
+document.querySelectorAll('.chart-container').forEach(container => {
+    resizeObserver.observe(container);
 });
 </script>
 {% endblock %}
