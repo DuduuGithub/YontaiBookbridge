@@ -220,7 +220,6 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
             OR Doc_simplifiedText LIKE :like_query
             OR Doc_originalText LIKE :like_query
         """
-        
         params = {
             'query': formatted_query,
             'like_query': f'%{query}%'  # 添加 LIKE 查询作为备选

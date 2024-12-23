@@ -235,6 +235,41 @@ def register():
     
     return render_template('user/register.html')
 
+@user_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = request.form.get('remember', False) == 'on'
+        
+        print(f"Login attempt - Username: {username}")
+        
+        # 测试数据库查询
+        user = db_one_filter_record(Users, 'User_name', username)
+        
+        if not user:
+            flash('用户名或密码错误', 'danger')
+            return render_template('user/login.html')
+        
+        # 验证密码
+        is_valid = check_password_hash(user.User_passwordHash, password)
+        
+        if is_valid:
+            login_user(user, remember=remember)
+            # 记录登录日志
+            log_audit('Login', 'Users', f'用户 {username} 登录系统')
+            next_page = request.args.get('next')
+            if next_page and next_page != url_for('user.login'):
+                return redirect(next_page)
+            return redirect(url_for('home.index'))
+        
+        else:
+            flash('用户名或密码错误', 'danger')
+            return render_template('user/login.html')
+        
+    
+    return render_template('user/login.html')
+
 @user_bp.route('/logout')
 @login_required
 def logout():
