@@ -182,12 +182,20 @@ BEGIN
         -- 获取关系类型
         SET @relation_type = JSON_UNQUOTE(JSON_EXTRACT(data, '$.relation'));
         
-        -- ��果有关系类型，则插入到 Relations 表
+        -- 如果有关系类型，则插入到 Relations 表
         IF @relation_type IS NOT NULL AND @relation_type != '' THEN
-            -- 直接插入关系
-            INSERT INTO Relations (Alice_id, Bob_id, Relation_type)
-            VALUES (alice_person_id, bob_person_id, @relation_type);
-        END IF;
+            -- 检查 Alice_id 和 Bob_id 的关系是否已存在
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM Relations 
+                WHERE Alice_id = alice_person_id 
+                AND Bob_id = bob_person_id
+            ) THEN
+                -- 如果不存在，则插入新的关系
+                INSERT INTO Relations (Alice_id, Bob_id, Relation_type)
+                VALUES (alice_person_id, bob_person_id, @relation_type);
+         END IF;
+END IF;
     END;
     
     -- 6. 处理参与者

@@ -59,3 +59,27 @@ GROUP BY
     c.Alice_id,
     c.Bob_id,
     r.Relation_type;
+    
+-- 创建收藏夹视图
+CREATE VIEW FolderDocumentStats AS
+SELECT 
+    f.Folder_id,                        -- 收藏夹ID
+    f.Folder_name,                      -- 收藏夹名称
+    COUNT(CASE WHEN d.Doc_type = '借钱契' THEN 1 END) AS Borrow_Contract,  -- 借钱契数量
+    COUNT(CASE WHEN d.Doc_type = '租赁契' THEN 1 END) AS Lease_Contract,  -- 租赁契数量
+    COUNT(CASE WHEN d.Doc_type = '抵押契' THEN 1 END) AS Mortgage_Contract,  -- 抵押契数量
+    COUNT(CASE WHEN d.Doc_type = '赋税契' THEN 1 END) AS Tax_Contract,  -- 赋税契数量
+    COUNT(CASE WHEN d.Doc_type = '诉状' THEN 1 END) AS Lawsuit,  -- 诉状数量
+    COUNT(CASE WHEN d.Doc_type = '判决书' THEN 1 END) AS Judgement,  -- 判决书数量
+    COUNT(CASE WHEN d.Doc_type = '祭祀契约' THEN 1 END) AS Sacrificial_Contract,  -- 祭祀契约数量
+    COUNT(CASE WHEN d.Doc_type = '祠堂契' THEN 1 END) AS Ancestral_Hall_Contract,  -- 祠堂契数量
+    COUNT(CASE WHEN d.Doc_type = '劳役契' THEN 1 END) AS Labor_Contract,  -- 劳役契数量
+    COUNT(CASE WHEN d.Doc_type = '其他' THEN 1 END) AS Other_Contract   -- 其他类型数量
+FROM 
+    Folders f
+JOIN 
+    FolderContents fc ON f.Folder_id = fc.Folder_id   -- 连接文件夹内容
+JOIN 
+    Documents d ON fc.Doc_id = d.Doc_id                -- 连接文书表
+GROUP BY 
+    f.Folder_id, f.Folder_name;                        -- 按文件夹分组
