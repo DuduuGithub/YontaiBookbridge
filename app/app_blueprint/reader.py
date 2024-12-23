@@ -69,6 +69,20 @@ def document(doc_id):
     try:
         doc = validate_document_access(doc_id)
         
+         # 检查图片文件是否存在
+        png_file = os.path.join(current_app.static_folder, 'images', 'documents', f'doc_img_{doc_id}.png')
+        jpg_file = os.path.join(current_app.static_folder, 'images', 'documents', f'doc_img_{doc_id}.jpg')
+        
+        png_exists = os.path.exists(png_file)
+        jpg_exists = os.path.exists(jpg_file)
+        
+        picture_path=None
+        if png_exists:
+            picture_path='images/documents/doc_img_'+doc_id+'.png'
+        elif jpg_exists:
+            picture_path='images/documents/doc_img_'+doc_id+'.jpg'
+        
+        
         # 获取关键词
         keywords = DocKeywords.query.filter_by(Doc_id=doc_id).all()
         
@@ -109,8 +123,6 @@ def document(doc_id):
         # 从 URL 参数获取 from_page 和 folder_id
         from_page = request.args.get('from_page', default=None)
         folder_id = request.args.get('folder_id', default=None)
-        print(from_page)
-        print("***************************************************")
         # 准备模板数据
         data = {
             'document': doc,
@@ -125,7 +137,8 @@ def document(doc_id):
             'evernotes': [],
             'corrections': [],  # 添加纠错记录列表
             'from_page': from_page,  # 添加 from_page 参数
-            'folder_id': folder_id   # 添加 folder_id 参数（如果存在）
+            'folder_id': folder_id,   # 添加 folder_id 参数（如果存在）
+            'picture_path':picture_path
         }
         
         if current_user.is_authenticated:
@@ -184,6 +197,8 @@ def document(doc_id):
         
     except Exception as e:
         logger.error(f"Error in document route: {str(e)}")
+        print("*"*40)
+        print(f"Error in document route: {str(e)}")
         flash('获取文档失败，请稍后再试', 'error')
         return redirect(url_for('searcher.index'))
 
@@ -1323,14 +1338,20 @@ def call_llm():
             api_key=api_key,
             base_url=base_url
         )
-        
+        print(data)
+        print(type(data['doc_title']))
+        prompt = "你是一个永泰文书处理小助手，你的名字叫永泰小桥，你将根据提供给你的文书的相关内容来回答用户有关该文书内容的疑问。\n" \
+         "文书的标题是：{}\n\n" \
+         "文书的内容是：{}\n\n" \
+         "用户的问题是：{}\n\n".format(data['doc_title'], data['doc_content'], data['prompt'])
+
         try:
             # 调用API
             completion = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": data['prompt']}
+                    {"role": "user", "content": prompt}
                 ],
                 temperature=0.3
             )

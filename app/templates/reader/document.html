@@ -23,11 +23,13 @@
         <!-- 左侧文书图片 -->
         <div class="col-3">
             <div class="document-image bg-light rounded p-3">
-                <img src="{{ url_for('static', filename='images/documents/doc_img_' + document.Doc_id + '.png') }}" 
-                     alt="文书图片" 
-                     class="img-fluid rounded">
+                <img src="{{ url_for('static', filename=picture_path) }}" 
+                    alt="文书图片" 
+                    class="img-fluid rounded">
             </div>
         </div>
+
+
 
         <!-- 中间内容区 -->
         <div class="col-6">
@@ -392,7 +394,7 @@
                 <div class="chat-header p-3 border-bottom">
                     <h5 class="mb-0">
                         <i class="bi bi-robot"></i>
-                        AI文书助手
+                        永泰小桥ai助手
                     </h5>
                 </div>
                 

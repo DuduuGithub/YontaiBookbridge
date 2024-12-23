@@ -159,19 +159,6 @@ def login():
             flash('用户名或密码错误', 'danger')
             return render_template('user/login.html')
         
-        # 验证密码
-        is_valid = check_password_hash(user.User_passwordHash, password)
-        
-        if is_valid:
-            login_user(user, remember=remember)
-            # 记录登录日志
-            log_audit('Login', 'Users', f'用户 {username} 登录系统')
-            next_page = request.args.get('next')
-            if next_page and next_page != url_for('user.login'):
-                return redirect(next_page)
-            return redirect(url_for('home.index'))
-        
-        flash('用户名或密码错误', 'danger')
     
     return render_template('user/login.html')
 
