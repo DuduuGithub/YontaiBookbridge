@@ -78,22 +78,24 @@ def dashboard():
                              reading_history=reading_history,
                              folders=folders)
 
+
 @user_bp.route('/profile')
 @login_required
 def profile():
     """个人设置页面"""
     return render_template('user/profile.html')
 
+
 @user_bp.route('/update_profile', methods=['POST'])
 @login_required
 def update_profile():
     # 获取表单数据
-    username = request.form.get('username')
-    email = request.form.get('email')
+    username = request.form.get('username').strip()
+    email = request.form.get('email').strip()
     new_password = request.form.get('new_password')
     avatar_id = request.form.get('avatar_id')
-    
-    # 更新用户信息
+
+    # 准备更新的数据
     update_data = {
         'User_name': username,
         'User_email': email,
@@ -106,61 +108,29 @@ def update_profile():
     try:
         # 更新数据库
         db_update_key(Users, current_user.User_id, **update_data)
+        
         # 记录审计日志，添加更详细的描述
         changes = []
-        if 'User_name' in update_data:
+        if current_user.User_name != username:
             changes.append('用户名')
-        if 'User_email' in update_data:
+        if current_user.User_email != email:
             changes.append('邮箱')
-        if 'User_passwordHash' in update_data:
+        if new_password:
             changes.append('密码')
-        if 'avatar_id' in update_data:
+        if current_user.avatar_id != avatar_id:
             changes.append('头像')
-            
-        change_desc = '、'.join(changes)
+
+        change_desc = '、'.join(changes) if changes else "无修改项"
         log_audit('Update', 'Users', 
                  f'用户 {current_user.User_name} 更新了个人信息: {change_desc}')
         flash('个人信息更新成功！', 'success')
+
     except Exception as e:
         flash('更新失败，请稍后重试', 'danger')
-   
-    flash('个人信息更新成功！', 'success')
+        return redirect(url_for('user.profile'))
+    
     return redirect(url_for('user.dashboard'))
 
-@user_bp.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        remember = request.form.get('remember', False) == 'on'
-        
-        print(f"Login attempt - Username: {username}")
-        
-        # 测试数据库查询
-        user = db_one_filter_record(Users, 'User_name', username)
-        
-        if not user:
-            flash('用户名或密码错误', 'danger')
-            return render_template('user/login.html')
-        
-        # 验证密码
-        is_valid = check_password_hash(user.User_passwordHash, password)
-        
-        if is_valid:
-            login_user(user, remember=remember)
-            # 记录登录日志
-            log_audit('Login', 'Users', f'用户 {username} 登录系统')
-            next_page = request.args.get('next')
-            if next_page and next_page != url_for('user.login'):
-                return redirect(next_page)
-            return redirect(url_for('home.index'))
-        
-        else:
-            flash('用户名或密码错误', 'danger')
-            return render_template('user/login.html')
-        
-    
-    return render_template('user/login.html')
 
 def validate_password(password):
     """验证密码强度"""
