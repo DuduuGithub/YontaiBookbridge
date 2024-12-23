@@ -192,7 +192,7 @@
                             <td>{{ doc.Doc_title }}</td>
                             <td>{{ doc.Doc_type }}</td>
                             <td>
-                                <a href="{{ url_for('reader.document', doc_id=doc.Doc_id) }}" class="btn btn-sm btn-primary">
+                                <a href="{{ url_for('reader.document', doc_id=doc.Doc_id) }}?from_page=folder&folder_id={{folder.Folder_id}}" class="btn btn-sm btn-primary">
                                     <i class="fas fa-eye"></i> 查看
                                 </a>
                                 <button class="btn btn-sm btn-danger" onclick="removeFromFolder('{{ doc.Doc_id }}')">

@@ -106,6 +106,12 @@ def document(doc_id):
             for participant, person in participants_query
         ]
         
+        # 从 URL 参数获取 from_page 和 folder_id
+        from_page = request.args.get('from_page', default=None)
+        folder_id = request.args.get('folder_id', default=None)
+        print(from_page)
+        print("***************************************************")
+        # 准备模板数据
         data = {
             'document': doc,
             'content': doc.Doc_originalText,
@@ -117,7 +123,9 @@ def document(doc_id):
             'notes': [],
             'comments': [],
             'evernotes': [],
-            'corrections': []  # 添加纠错记录列表
+            'corrections': [],  # 添加纠错记录列表
+            'from_page': from_page,  # 添加 from_page 参数
+            'folder_id': folder_id   # 添加 folder_id 参数（如果存在）
         }
         
         if current_user.is_authenticated:

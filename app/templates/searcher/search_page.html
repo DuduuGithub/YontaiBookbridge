@@ -790,7 +790,6 @@ function performAdvancedSearch(params) {
     });
 }
 
-// 其他函数保持不变...
 
 function updateDocumentList(documents) {
     const container = document.getElementById('document-container');
@@ -806,7 +805,7 @@ function updateDocumentList(documents) {
             .join('');
         
         col.innerHTML = `
-            <a href="/reader/document/${doc.doc_id}" class="text-decoration-none">
+            <a href="/reader/document/${doc.doc_id}?from_page=searcher" class="text-decoration-none">
                 <div class="document-card hover-shadow">
                     <span class="doc-id">${doc.doc_id}</span>
                     
