@@ -43,6 +43,9 @@ def admin_required(f):
 @user_bp.route('/dashboard')
 @login_required
 def dashboard():
+    # 获取active_tab参数，默认为None
+    active_tab = request.args.get('active_tab', None)
+    
     if current_user.User_role == 'Admin':
         # 获取管理员统计数据
         doc_count = Documents.query.count()
@@ -76,7 +79,8 @@ def dashboard():
         
         return render_template('user/dashboard.html',
                              reading_history=reading_history,
-                             folders=folders)
+                             folders=folders,
+                             active_tab=active_tab)
 
 
 @user_bp.route('/profile')
@@ -451,7 +455,7 @@ def add_document():
                 # 获取文书文本
                 original_text = request.form.get('document_text', '').strip()
                 if not original_text:
-                    flash('文书文本不能为空', 'danger')
+                    flash('文书���本不能为空', 'danger')
                     return redirect(request.url)
                 
                 try:
@@ -510,7 +514,7 @@ def check_doc_id():
         if not re.match(r'^\d+-\d+-\d+-\d+$', doc_id):
             return jsonify({
                 'exists': True, 
-                'message': '册号格式不正确',
+                'message': '册号格��不正确',
                 'csrf_token': generate_csrf()  # 返回新的 CSRF token
             })
         

@@ -13,7 +13,7 @@ from Database.model import (
     Documents, Users, Comments, Highlights,
     Notes, Evernote, AuditLog, Folders,
     DocKeywords, Contractors, Relations, Participants, People,
-    FolderContents, Corrections
+    FolderContents, Corrections, UserBrowsingHistory
 )
 from Database.config import db
 from flask_login import login_required, current_user
@@ -68,6 +68,20 @@ def create_audit_log(user_id, action, description, table_name, record_id=None):
 def document(doc_id):
     try:
         doc = validate_document_access(doc_id)
+        
+        # 如果用户已登录，记录浏览历史
+        if current_user.is_authenticated:
+            try:
+                browse_history = UserBrowsingHistory(
+                    User_id=current_user.User_id,
+                    Doc_id=doc_id,
+                    Browse_time=datetime.now()
+                )
+                db.session.add(browse_history)
+                db.session.commit()
+            except Exception as e:
+                logger.error(f"记录浏览历史失败: {str(e)}")
+                db.session.rollback()
         
          # 检查图片文件是否存在
         png_file = os.path.join(current_app.static_folder, 'images', 'documents', f'doc_img_{doc_id}.png')
@@ -578,7 +592,7 @@ def export_document(doc_id, text_type):
                             p.add_run(f'• {highlighted_text}')
                             p.add_run(f' (标注时间: {h.Highlight_createdAt.strftime("%Y-%m-%d %H:%M:%S")})')
                         except Exception as e:
-                            logger.error(f"处理高��文本时出错: {str(e)}")
+                            logger.error(f"处理高亮文本时出错: {str(e)}")
                 
                 if notes:
                     word_doc.add_heading('批注内容', level=2)
@@ -606,7 +620,7 @@ def export_document(doc_id, text_type):
         word_doc.save(file_stream)
         file_stream.seek(0)
         
-        # 创建审��日志
+        # 创建审计日志
         create_audit_log(
             current_user.User_id,
             'EXPORT',

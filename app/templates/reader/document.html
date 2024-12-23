@@ -13,6 +13,11 @@
         {% elif from_page == 'folder' %}
             <li class="breadcrumb-item"><a href="{{ url_for('user.dashboard') }}">个人中心</a></li>
             <li class="breadcrumb-item"><a href="{{ url_for('user.folder_detail', folder_id=folder_id) }}">我的收藏</a></li>
+        {% elif from_page == 'history' %}
+            <li class="breadcrumb-item"><a href="{{ url_for('user.dashboard') }}">个人中心</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('user.dashboard', active_tab='browsingHistory') }}">浏览记录</a></li>
+        {% else %}
+            <li class="breadcrumb-item"><a href="{{ url_for('home.index') }}">首页</a></li>
         {% endif %}
         <li class="breadcrumb-item active">{{ document.Doc_title }}</li>
     </ol>
