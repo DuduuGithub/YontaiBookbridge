@@ -118,6 +118,12 @@
             <span class="visually-hidden">Loading...</span>
         </div>
         <h5>正在处理文书信息，请稍候...</h5>
+
+        <!-- 添加进度条 -->
+        <div class="progress mt-3" style="height: 25px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <p id="progressText" class="mt-2">0% 完成</p>
     </div>
 </div>
 {% endblock %}
@@ -228,10 +234,26 @@ function clearCache() {
 }
 
 // 保存全部文书
+// 保存全部文书
 async function saveAllDocuments() {
     try {
-        const cachedDocuments = JSON.parse(localStorage.getItem('cachedDocuments') || '[]');
-        
+        // 从数据库获取缓存文书数据
+        const response = await fetch('/user/get_cached_documents', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'  // 如果需要 CSRF Token
+            }
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error('无法获取缓存文书数据');
+        }
+
+        const cachedDocuments = data.documents; // 从响应中获取文书数据
+
         if (cachedDocuments.length === 0) {
             Swal.fire({
                 title: '提示',
@@ -245,8 +267,15 @@ async function saveAllDocuments() {
         let successCount = 0;
         let errors = [];
 
+        // 计算进度
+        const totalDocuments = cachedDocuments.length;
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+
         // 遍历缓存的文书并逐一保存
-        for (const doc of cachedDocuments) {
+        for (let i = 0; i < cachedDocuments.length; i++) {
+            const doc = cachedDocuments[i];
+
             try {
                 console.log(`开始保存文书 ${doc.doc_id}`);
 
@@ -254,24 +283,20 @@ async function saveAllDocuments() {
                 const formData = new FormData();
                 formData.append('doc_id', doc.doc_id);
                 formData.append('document_text', doc.text);
-                
-                // 将 base64 图片转换为 Blob
-                const base64Data = doc.image.split(',')[1];
+
+                // 将 base64 图片转换为 Blob（假设 doc.image 是图片的 base64 数据）
+                const base64Data = doc.image.split(',')[1]; // 如果是 base64 格式的图片
                 const blob = await fetch(doc.image).then(res => res.blob());
                 formData.append('document_image', blob, `${doc.doc_id}.jpg`);
-                
-                // 直接从隐藏的 input 字段获取 CSRF token
-                formData.append('csrf_token', '{{ csrf_token() }}');
 
-                console.log('准备发送请求...');
+                // 添加 CSRF token
+                formData.append('csrf_token', '{{ csrf_token() }}');
 
                 // 发送请求保存文书
                 const saveResponse = await fetch('/user/add_document', {
                     method: 'POST',
                     body: formData
                 });
-
-                console.log('请求已发送，状态:', saveResponse.status);
 
                 if (!saveResponse.ok) {
                     const errorData = await saveResponse.json();
@@ -286,8 +311,14 @@ async function saveAllDocuments() {
                 console.error(`保存文书 ${doc.doc_id} 失败:`, error);
                 errors.push(`文书 ${doc.doc_id}: ${error.message}`);
             }
+
+            // 更新进度条
+            const progress = ((i + 1) / totalDocuments) * 100;
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `${Math.round(progress)}% 完成`;
         }
 
+        // 完成后隐藏遮罩
         document.getElementById('loadingOverlay').style.display = 'none';
 
         if (successCount === 0) {
@@ -311,22 +342,32 @@ async function saveAllDocuments() {
             });
         }
 
-        // 清空已成功保存的文书
-        if (successCount > 0) {
-            let remainingDocs = cachedDocuments.filter((_, index) => !errors.includes(index));
-            if (remainingDocs.length === 0) {
-                localStorage.removeItem('cachedDocuments');
-            } else {
-                localStorage.setItem('cachedDocuments', JSON.stringify(remainingDocs));
+        // 清空数据库中的缓存表
+        const clearCacheResponse = await fetch('/user/clear_cache', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token() }}'
             }
-            updateDocumentDisplay();
+        });
+
+        const clearCacheData = await clearCacheResponse.json();
+
+        if (clearCacheData.success) {
+            console.log('缓存表已清空');
+        } else {
+            console.error('清空缓存表失败:', clearCacheData.message);
         }
 
+
         if (successCount === cachedDocuments.length) {
-            // 如果全部成功才跳转
+            // 如果全部成功，跳转到文书管理页面
             window.location.href = '{{ url_for("user.manage_documents") }}';
+        } else {
+            // 如果保存过程中部分成功，也可以刷新页面
+            location.reload();
         }
-        
+
     } catch (error) {
         document.getElementById('loadingOverlay').style.display = 'none';
         console.error('保存文书失败:', error);
@@ -337,5 +378,6 @@ async function saveAllDocuments() {
         });
     }
 }
+
 </script>
 {% endblock %}

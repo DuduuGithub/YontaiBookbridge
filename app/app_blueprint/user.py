@@ -479,7 +479,26 @@ def remove_cached_document():
     else:
         return jsonify({'success': False, 'message': '文书不存在'})
 
+@user_bp.route('/get_cached_documents', methods=['GET'])
+def get_cached_documents():
+    try:
+        # 获取所有缓存的文书记录
+        cached_documents = CachedDocument.query.all()
 
+        # 将文书记录转换为字典并返回
+        documents = []
+        for doc in cached_documents:
+            documents.append({
+                'doc_id': doc.doc_id,
+                'text': doc.doc_originalText,  # 假设文书数据有 text 字段
+                'image': doc.image_path,  # 假设文书数据有 image_path 字段
+            })
+
+        return jsonify({'success': True, 'documents': documents})
+
+    except Exception as e:
+        print(str(e))
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @user_bp.route('/clear_cache', methods=['POST'])
 def clear_cache():
