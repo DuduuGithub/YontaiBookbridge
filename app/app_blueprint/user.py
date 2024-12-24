@@ -512,16 +512,22 @@ def clear_cache():
                 upload_folder = os.path.join(current_app.static_folder)
                 file_path = os.path.join(upload_folder, doc.image_path)
                 print(f"************************删除文件: {repr(file_path)}")  # 调试信息
-                
-                # 检查文件是否存在
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                        print(f"图片已删除: {file_path}")
-                    except Exception as e:
-                        print(f"删除文件失败: {file_path}, 错误: {e}")
+
+                # 检查文档表中是否存在该文书
+                document_exists = Documents.query.filter_by(Doc_id=doc.doc_id).first()
+
+                if document_exists:
+                    print(f"文书 {doc.doc_id} 在文档表中存在，保留图片")
                 else:
-                    print(f"图片未找到: {file_path}")  # 如果文件不存在
+                    # 文书不存在，检查文件是否存在
+                    if os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            print(f"图片已删除: {file_path}")
+                        except Exception as e:
+                            print(f"删除文件失败: {file_path}, 错误: {e}")
+                    else:
+                        print(f"图片未找到: {file_path}")  # 如果文件不存在
         
         # 删除缓存文书记录
         CachedDocument.query.delete()
@@ -577,11 +583,19 @@ def add_document():
                     
                     # 保存文件
                     file_path = os.path.join(upload_folder, new_filename)
-                    file.save(file_path)
-                    print(f"文件已保存到: {file_path}") # 调试信息
-                    
-                    # 使用相对路径
-                    relative_path = os.path.join('images', 'documents', new_filename)
+                    # 检查文件是否已存在
+                    if os.path.exists(file_path):
+                        print(f"文件已存在: {file_path}")  # 调试信息
+                        relative_path = os.path.join('images', 'documents', new_filename)  # 使用相对路径
+                    else:
+                        try:
+                            # 保存文件
+                            file.save(file_path)
+                            print(f"文件已保存到: {file_path}")  # 调试信息
+                            relative_path = os.path.join('images', 'documents', new_filename)
+                        except Exception as e:
+                            print(f'保存文件失败: {str(e)}')
+                            return jsonify({'message': f'保存文件失败: {str(e)}'}), 500
                     
                 except Exception as e:
                     print(f'保存文件失败: {str(e)}')

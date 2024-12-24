@@ -4,6 +4,15 @@
 
 {% block content %}
 <div class="container mt-4">
+    <!-- 面包屑导航 -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('home.index') }}">首页</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('analysis.index') }}">数据分析</a></li>
+            <li class="breadcrumb-item active" aria-current="page">统计分析</li>
+        </ol>
+    </nav>
+
     <!-- 标题 -->
     <h2 class="text-center mb-4">统计分析</h2>
 
@@ -47,6 +56,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const urlParams = new URLSearchParams(window.location.search);
     const sourceId = urlParams.get('source_id');
     const dimension = urlParams.get('dimension');
+    const granularity = urlParams.get('granularity') || 'year'; // 默认granularity为'year'
 
     // 检查参数
     if (!sourceId || !dimension) {
@@ -54,8 +64,29 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    // 更新图表
+    updateCharts(sourceId, dimension, granularity);
+
+    // 导出功能
+    document.getElementById('export-results').addEventListener('click', function () {
+        window.location.href = `/analysis/api/export_statistics?source_id=${sourceId}&dimension=${dimension}&granularity=${granularity}`;
+    });
+});
+
+function updateCharts(sourceId, dimension, granularity) {
+    // 根据dimension和granularity设置图表标题
+    let barChartTitle, pieChartTitle;
+
+    if (dimension === 'time') {
+        barChartTitle = granularity === 'year' ? '年度文书时间分布' : (granularity === 'month' ? '月度文书时间分布' : '文书时间分布');
+        pieChartTitle = granularity === 'year' ? '年度文书时间分布占比' : (granularity === 'month' ? '月度文书时间分布占比' : '文书时间分布占比');
+    } else if (dimension === 'type') {
+        barChartTitle = '文书类型分布';
+        pieChartTitle = '文书类型分布占比';
+    }
+
     // 获取统计数据
-    fetch(`/analysis/api/get_statistics?folder_id=${sourceId}&dimension=${dimension}`)
+    fetch(`/analysis/api/get_statistics?folder_id=${sourceId}&dimension=${dimension}&granularity=${granularity}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -64,14 +95,14 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(data => {
             if (data.success) {
-                // 渲染柱状图
+                // 更新柱状图
                 const barCtx = document.getElementById('bar-chart').getContext('2d');
-                new Chart(barCtx, {
+                const barChart = new Chart(barCtx, {
                     type: 'bar',
                     data: {
                         labels: data.bar_chart.labels,
                         datasets: [{
-                            label: '文书数量',
+                            label: barChartTitle,
                             data: data.bar_chart.values,
                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
                             borderColor: 'rgba(54, 162, 235, 1)',
@@ -84,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         plugins: {
                             title: {
                                 display: true,
-                                text: '文书时间分布',
+                                text: barChartTitle,
                                 padding: {
                                     top: 10,
                                     bottom: 20
@@ -117,9 +148,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
 
-                // 渲染饼图
+                // 更新饼图
                 const pieCtx = document.getElementById('pie-chart').getContext('2d');
-                new Chart(pieCtx, {
+                const pieChart = new Chart(pieCtx, {
                     type: 'pie',
                     data: {
                         labels: data.pie_chart.labels,
@@ -148,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         plugins: {
                             title: {
                                 display: true,
-                                text: '文书时间分布占比',
+                                text: pieChartTitle,
                                 padding: {
                                     top: 10,
                                     bottom: 20
@@ -181,14 +212,9 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('Error loading statistics:', error);
             alert('统计数据加载失败，请稍后再试。');
         });
+}
 
-    // 导出功能
-    document.getElementById('export-results').addEventListener('click', function () {
-        window.location.href = `/analysis/api/export_statistics?source_id=${sourceId}&dimension=${dimension}`;
-    });
-});
-
-// 添加单独导出图表的功能
+// 导出图表的功能
 function exportChart(chartId, filename) {
     const canvas = document.getElementById(chartId);
     const image = canvas.toDataURL('image/png', 1.0);

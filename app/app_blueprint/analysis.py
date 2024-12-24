@@ -51,6 +51,8 @@ def get_folders():
 def generate_graph():
     """
     生成关系网络的节点和边数据 - 只显示Relations表中的关系
+    同名的人物会被合并为同一个节点
+    如果一个人名包含另一个人名(如"叔文藻"包含"文藻")，则认为是同一个人，使用较长的名字
     """
     try:
         folder_id = request.args.get('folder_id')
@@ -86,11 +88,14 @@ def generate_graph():
         if not person_ids:
             return jsonify({'success': False, 'message': '未找到相关人物关系'}), 400
 
-        # 修改这部分查询逻辑
+        # 修改查询逻辑，排除 Relation_type 为 "null" 的记录
         relations = db.session.query(Relations).filter(
-            db.or_(
-                Relations.Alice_id.in_(person_ids),
-                Relations.Bob_id.in_(person_ids)
+            db.and_(
+                db.or_(
+                    Relations.Alice_id.in_(person_ids),
+                    Relations.Bob_id.in_(person_ids)
+                ),
+                Relations.Relation_type != "null"  # 只排除字符串 "null"
             )
         ).all()
 
@@ -107,41 +112,96 @@ def generate_graph():
         people = db.session.query(People).filter(
             People.Person_id.in_(related_person_ids)
         ).all()
-        people_dict = {p.Person_id: p.Person_name for p in people}
+
+        # 处理名字映射
+        name_groups = {}  # 用于存储相关名字组
+        all_names = [person.Person_name for person in people]
+        
+        # 按名字长度降序排序，确保较长的名字先被处理
+        all_names.sort(key=len, reverse=True)
+        
+        # 构建名字组
+        for name in all_names:
+            found_group = False
+            for group_name in list(name_groups.keys()):
+                # 如果当前名字包含在组名中，或组名包含在当前名字中
+                if name in group_name or group_name in name:
+                    # 使用较长的名字作为组名
+                    new_group_name = name if len(name) > len(group_name) else group_name
+                    if group_name != new_group_name:
+                        name_groups[new_group_name] = name_groups.pop(group_name)
+                    name_groups[new_group_name].add(name)
+                    found_group = True
+                    break
+            if not found_group:
+                name_groups[name] = {name}
+
+        # 创建名字到标准名字(组名)的映射
+        name_to_standard = {}
+        for standard_name, group in name_groups.items():
+            for name in group:
+                name_to_standard[name] = standard_name
+
+        # 创建标准名字到ID的映射
+        standard_name_to_id = {}
+        id_to_standard_name = {}
+        for person in people:
+            standard_name = name_to_standard[person.Person_name]
+            if standard_name not in standard_name_to_id:
+                standard_name_to_id[standard_name] = person.Person_id
+            id_to_standard_name[person.Person_id] = standard_name
 
         # 构建节点和边
         nodes = []
-        edges = []
+        edges = set()  # 使用集合去重
 
-        # 添加节点
+        # 添加节点 - 只为每个标准名字添加一个节点
+        added_names = set()
         for person_id in related_person_ids:
-            if person_id in people_dict:
-                nodes.append({
-                    'id': person_id,
-                    'label': people_dict[person_id]
-                })
+            if person_id in id_to_standard_name:
+                standard_name = id_to_standard_name[person_id]
+                if standard_name not in added_names:
+                    nodes.append({
+                        'id': standard_name_to_id[standard_name],
+                        'label': standard_name
+                    })
+                    added_names.add(standard_name)
 
-        # 添加边
+        # 添加边 - 使用标准名字来判断重复
         for relation in relations:
-            edges.append({
-                'source': relation.Alice_id,
-                'target': relation.Bob_id,
-                'label': relation.Relation_type,
+            alice_standard_name = id_to_standard_name[relation.Alice_id]
+            bob_standard_name = id_to_standard_name[relation.Bob_id]
+            alice_id = standard_name_to_id[alice_standard_name]
+            bob_id = standard_name_to_id[bob_standard_name]
+            
+            # 创建边的唯一标识
+            edge_key = tuple(sorted([alice_id, bob_id]) + [relation.Relation_type])
+            if edge_key not in edges:
+                edges.add(edge_key)
+
+        # 将边的集合转换为列表
+        edges_list = [
+            {
+                'source': edge[0],
+                'target': edge[1],
+                'label': edge[2],
                 'directed': False
-            })
+            }
+            for edge in edges
+        ]
 
         # 添加日志，查看生成的节点和边
         logging.debug(f"Generated nodes: {nodes}")
-        logging.debug(f"Generated edges: {edges}")
+        logging.debug(f"Generated edges: {edges_list}")
 
         return jsonify({
             'success': True,
             'data': {
                 'nodes': nodes,
-                'edges': edges,
+                'edges': edges_list,
                 'metadata': {
                     'node_count': len(nodes),
-                    'edge_count': len(edges)
+                    'edge_count': len(edges_list)
                 }
             }
         })
@@ -149,6 +209,7 @@ def generate_graph():
     except Exception as e:
         logging.error(f"Error generating graph: {str(e)}")
         return jsonify({'success': False, 'message': f"生成网络图失败：{str(e)}"}), 500
+
 
 
 
@@ -178,7 +239,7 @@ def get_statistics():
     try:
         folder_id = request.args.get('folder_id')
         dimension = request.args.get('dimension')
-
+        
         if not folder_id or not dimension:
             return jsonify({'success': False, 'error': '缺少必要参数'}), 400
 
@@ -206,9 +267,7 @@ def get_statistics():
                 TimeRecord.createdData
             ).all()
 
-            # 添加调试日志
-            logging.debug(f"Time statistics query result: {time_stats}")
-
+            # 直接返回时间统计结果，不需要进一步的粒度处理
             if not time_stats:
                 return jsonify({
                     'success': True,
@@ -217,8 +276,8 @@ def get_statistics():
                 })
 
             # 准备图表数据
-            labels = [stat[0] for stat in time_stats]
-            values = [stat[1] for stat in time_stats]
+            labels = [stat[0] for stat in time_stats]  # 时间数据
+            values = [stat[1] for stat in time_stats]  # 对应的数量
 
             return jsonify({
                 'success': True,
@@ -247,9 +306,6 @@ def get_statistics():
             ).order_by(
                 Documents.Doc_type
             ).all()
-
-            # 添加调试日志
-            logging.debug(f"Type statistics query result: {type_stats}")
 
             if not type_stats:
                 return jsonify({
@@ -280,6 +336,7 @@ def get_statistics():
     except Exception as e:
         logging.error(f"Error generating statistics: {str(e)}")
         return jsonify({'success': False, 'error': f'生成统计数据失败：{str(e)}'}), 500
+
 
 
 
