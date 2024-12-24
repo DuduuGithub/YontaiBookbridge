@@ -232,9 +232,10 @@ CREATE TABLE IF NOT EXISTS FolderContents (
     INDEX idx_Doc_id (Doc_id)  -- 为 Doc_id 添加索引
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 19、文书图片缓存表
+-- 19、缓存表
 CREATE TABLE cached_documents (
     doc_id VARCHAR(20) PRIMARY KEY,
     doc_originalText TEXT NOT NULL,
     image_path VARCHAR(255) DEFAULT NULL
 );
+

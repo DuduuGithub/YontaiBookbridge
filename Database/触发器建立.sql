@@ -32,10 +32,9 @@ FOR EACH ROW
 BEGIN
     INSERT INTO AuditLog (User_id, Audit_actionType, Audit_actionDescription, Audit_targetTable, Audit_timestamp)
     VALUES (@current_id, 'Delete', 
-            CONCAT(@current_role, '删除了文书: ', @current_doc_id), 
+            '删除了文书: ', 
             'Documents', NOW());
 END $$
-
 -- 4. 标准时间表（插入）
 CREATE TRIGGER After_TimeRecord_Insert
 AFTER INSERT ON TimeRecord
@@ -104,7 +103,7 @@ FOR EACH ROW
 BEGIN
     INSERT INTO AuditLog (User_id, Audit_actionType, Audit_actionDescription, Audit_targetTable, Audit_timestamp)
     VALUES (@current_id, 'Delete', 
-            CONCAT(@current_role, '删除文书关键词记录: Doc_id = ', OLD.Doc_id, ', 关键词 = ', OLD.KeyWord),
+            '删除文书关键词记录: ',
             'DocKeywords', NOW());
 END $$
 

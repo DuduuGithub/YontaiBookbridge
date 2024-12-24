@@ -45,8 +45,6 @@ WHERE u.User_id= 2
 ORDER BY c.Comment_createdAt DESC
 LIMIT 5;
 
-
-
 -- 全文索引查询示例
 SELECT Doc_id,Doc_title, Doc_simplifiedText, Doc_originalText 
 FROM documents
@@ -55,4 +53,5 @@ AGAINST('凭票支出钱贰仟四百文正期约本年十' IN BOOLEAN MODE)
 ORDER BY MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
 AGAINST('凭票支出钱贰仟四百文正期约本年十' IN BOOLEAN MODE) DESC;
 
+-- DROP TRIGGER IF EXISTS After_Relations_Update;
 
