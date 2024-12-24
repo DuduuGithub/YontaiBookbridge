@@ -374,7 +374,7 @@ def view_logs():
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     logs = pagination.items
     
-    # 获取所有可能的操作类型和目标表（于筛选下拉框）
+    # 获取所有可能的操作类型和目标表（于筛选下拉框
     action_types = db.session.query(AuditLog.Audit_actionType.distinct()).all()
     action_types = [t[0] for t in action_types]
     
@@ -404,30 +404,31 @@ class DocumentForm(FlaskForm):
 @login_required
 @admin_required
 def add_document():
-    form = DocumentForm()  # 创建表单实例
-    
     if request.method == 'POST':
         try:
+            print("接收到 POST 请求") # 调试信息
+            
             # 获取并验证册号
             doc_id = request.form.get('doc_id')
+            print(f"册号: {doc_id}") # 调试信息
+            
             if not doc_id or not re.match(r'^\d+-\d+-\d+-\d+$', doc_id):
-                flash('册号格式不正确', 'danger')
-                return redirect(request.url)
+                return jsonify({'message': '册号格式不正确'}), 400
             
             # 检查册号是否已存在
             if Documents.query.get(doc_id):
-                flash('该册号已存在', 'danger')
-                return redirect(request.url)
-                
+                return jsonify({'message': '该册号已存在'}), 400
+            
             # 获取文书图片
             if 'document_image' not in request.files:
-                flash('没有上传文件', 'danger')
-                return redirect(request.url)
+                print("未找到文件") # 调试信息
+                return jsonify({'message': '没有上传文件'}), 400
             
             file = request.files['document_image']
+            print(f"文件名: {file.filename}") # 调试信息
+            
             if file.filename == '':
-                flash('没有选择文件', 'danger')
-                return redirect(request.url)
+                return jsonify({'message': '没有选择文件'}), 400
             
             if file and allowed_file(file.filename):
                 try:
@@ -442,65 +443,50 @@ def add_document():
                     # 保存文件
                     file_path = os.path.join(upload_folder, new_filename)
                     file.save(file_path)
-                    print(f"文件已保存到: {file_path}")
+                    print(f"文件已保存到: {file_path}") # 调试信息
                     
                     # 使用相对路径
                     relative_path = os.path.join('images', 'documents', new_filename)
                     
                 except Exception as e:
                     print(f'保存文件失败: {str(e)}')
-                    flash(f'保存文件失败: {str(e)}', 'danger')
-                    return redirect(request.url)
+                    return jsonify({'message': f'保存文件失败: {str(e)}'}), 500
                 
                 # 获取文书文本
                 original_text = request.form.get('document_text', '').strip()
+                print(f"文本长度: {len(original_text)}") # 调试信息
+                
                 if not original_text:
-                    flash('文书���本不能为空', 'danger')
-                    return redirect(request.url)
+                    return jsonify({'message': '文书文本不能为空'}), 400
                 
                 try:
                     # 处理文书信息
                     print(f"开始处理文书信息...")
                     doc_info = process_document_text(original_text, relative_path)
-                    # 添加文书册号
                     doc_info['doc_id'] = doc_id
                     print(f"文书信息处理完成: {doc_info}")
-                except Exception as e:
-                    print(f'处理文书信息失败: {str(e)}')
-                    flash(f'处理文书信息失败: {str(e)}', 'danger')
-                    return redirect(request.url)
-                
-                try:
+                    
                     # 插入数据库
-                    print(f"开始插入数据库...")
                     success, message = insert_document(doc_info)
                     print(f"数据库操作结果: success={success}, message={message}")
+                    
                     if success:
-                        
-                        # 记录审计日志，添加更多详细信息
-                        log_audit('Insert', 'Documents', 
-                                 f'管理员 {current_user.User_name} 添加了新文档: {doc_id}, 标题: {doc_info.get("title", "未知")}')
-                        
-                        flash('文书添加成功', 'success')
-                        return redirect(url_for('user.manage_documents'))
+                        log_audit('Insert', 'Documents', f'管理员添加了新文档: {doc_id}')
+                        return jsonify({'message': '文书添加成功'}), 200
                     else:
-                        flash(f'文书添加失败: {message}', 'danger')
-                        return redirect(request.url)
+                        return jsonify({'message': f'文书添加失败: {message}'}), 500
+                        
                 except Exception as e:
-                    print(f'数据库操作失败: {str(e)}')
-                    flash(f'数据库操作失败: {str(e)}', 'danger')
-                    return redirect(request.url)
+                    print(f'处理或保存文书失败: {str(e)}')
+                    return jsonify({'message': f'处理或保存文书失败: {str(e)}'}), 500
             else:
-                flash('不支持的文件类型', 'danger')
-                flash('不支持的文件类型', 'danger')
-                return redirect(request.url)
+                return jsonify({'message': '不支持的文件类型'}), 400
                 
         except Exception as e:
             print(f'发生错误: {str(e)}')
-            flash(f'发生错误: {str(e)}', 'danger')
-            return redirect(request.url)
+            return jsonify({'message': f'发生错误: {str(e)}'}), 500
             
-    return render_template('user/add_document.html', form=form)  # 传递表单到模板
+    return render_template('user/add_document.html')
 
 @user_bp.route('/check_doc_id', methods=['POST'])
 @login_required
@@ -514,7 +500,7 @@ def check_doc_id():
         if not re.match(r'^\d+-\d+-\d+-\d+$', doc_id):
             return jsonify({
                 'exists': True, 
-                'message': '册号格��不正确',
+                'message': '册号格式不正确',
                 'csrf_token': generate_csrf()  # 返回新的 CSRF token
             })
         
@@ -578,7 +564,7 @@ def remove_document(folder_id):
 
 def log_audit(action_type, target_table, description):
     """
-    记录审计日志
+    ��录审计日志
     
     Args:
         action_type: 操作类型 (Insert/Update/Delete)
@@ -632,3 +618,8 @@ def delete_document(doc_id):
             'success': False,
             'error': str(e)
         }), 500
+
+@user_bp.route('/cached_documents')
+@login_required
+def cached_documents():
+    return render_template('user/cached_documents.html')

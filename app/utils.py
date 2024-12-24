@@ -211,7 +211,7 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
         search_terms = query.split()
         formatted_query = ' '.join([f'+*{term}*' for term in search_terms])
         
-        # 构建基本的全文检索 SQL 查询
+        # 构��基本的全文检索 SQL 查询
         sql = """
             SELECT Doc_id FROM Documents
             WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
@@ -387,10 +387,10 @@ def get_document_info(text: str):
         
         # 构建提示词
         prompt_base = """分析下面这份清代契约文书，提取以下信息：
-        1. 文书标题
+        1. 文书标题（根据内容生成一个合适的标题）
         2. 文书类型（借钱契、租赁契、抵押契、赋税契、诉状、判决书、祭祀契约、祠堂契、劳役契、其他）
         3. 文书大意（200字以内）
-        4. 签订时间
+        4. 签订时间（从文书中提取具体的时间）
         5. 更改时间（如果有）
         6. 关键词（3-5个）
         7. 契约双方（两个人的姓名）
@@ -418,7 +418,7 @@ def get_document_info(text: str):
             "simple_text": "文书内容断句且简体化"
         }
 
-        请严格按照上述JSON格式返回结果。以下是文书内容：
+        请严格按照上述JSON格���返回结果。以下是文书内容：
         """
         
         # 创建消息
@@ -445,29 +445,18 @@ def get_document_info(text: str):
         # 解析返回的JSON
         try:
             result = json.loads(json_str)
+            # 验证返回的数据是否包含所有必要字段
+            required_fields = ['title', 'type', 'summary', 'created_time', 'keywords', 
+                             'contractors', 'participants', 'simple_text']
+            for field in required_fields:
+                if field not in result:
+                    raise ValueError(f"API返回的数据缺少必要字段: {field}")
             return result
         except Exception as e:
             print(f"解析文书信息失败: {e}")
             print(f"尝试解析的字符串: {json_str}")
-            # 返回模拟数据用于测试
-            return {
-                'title': '测试文书',
-                'type': '借钱契',
-                'summary': '这是一份测试用的文书大意，用于演示系统功能。',
-                'created_time': '康熙三年二月初五',
-                'updated_time': None,
-                'keywords': ['借钱', '契约', '测试'],
-                'contractors': [
-                    {'name': '张三'},
-                    {'name': '李四'}
-                ],
-                'relation': '叔侄',
-                'participants': [
-                    {'name': '王五', 'role': '见证人'},
-                    {'name': '赵六', 'role': '代书'}
-                ],
-                'simple_text': '这是一份测试用的文书内容，用于演示系统功能。'
-            }
+            raise ValueError(f"解析文书信息失败: {str(e)}")
+            
     except Exception as e:
         print(f"调用星火API失败: {e}")
         raise
@@ -575,7 +564,7 @@ class TestDocumentProcessing():
         立撮字黃興忠撮出錢壹仟貳百文正言約俟至癸巳年拾月中旬約紙照價里还不敢過期如是過��照例行息不敢久欠如是久欠保認代賠不負字照
         道光拾貳年拾二月日立撮字黃興忠
         保認侄長善
-        代字兄文廉
+        代���兄文廉
         """
         
         # 测试用的片路径
@@ -613,7 +602,7 @@ class TestDocumentProcessing():
             return True
                 
         except Exception as e:
-            print(f"���书信息提取失败: {str(e)}")
+            print(f"书信息提取失败: {str(e)}")
             return False
 
     def test_process_document_text(self):

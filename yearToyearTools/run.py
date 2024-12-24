@@ -1,6 +1,12 @@
 def load_era_data():
+    import os
+    # 获取当前脚本的绝对路径
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # 构建out.txt的绝对路径
+    out_file_path = os.path.join(script_dir, 'out.txt')
+    
     era_dict = {}
-    with open('yearToyearTools/out.txt', 'r', encoding='utf-8') as f:
+    with open(out_file_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line or ':' not in line:

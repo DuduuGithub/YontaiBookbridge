@@ -37,12 +37,26 @@
         text-align: center;
         color: white;
     }
+    #cacheStatus {
+        margin-top: 20px;
+        padding: 10px;
+        border-radius: 5px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <!-- 添加闪现消息显示 -->
+    <!-- 面包屑导航 -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('user.admin_dashboard') }}">控制台</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('user.manage_documents') }}">文书管理</a></li>
+            <li class="breadcrumb-item active">添加文书</li>
+        </ol>
+    </nav>
+
+    <!-- 闪现消息 -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -55,8 +69,8 @@
     {% endwith %}
     
     <div class="row">
+        <!-- 侧边栏 -->
         <div class="col-md-3">
-            <!-- 侧边栏 -->
             <div class="list-group">
                 <a href="{{ url_for('user.admin_dashboard') }}" class="list-group-item list-group-item-action">
                     <i class="fas fa-home"></i> 控制台首页
@@ -70,16 +84,17 @@
             </div>
         </div>
         
+        <!-- 主要内容 -->
         <div class="col-md-9">
             <div class="card">
                 <div class="card-header">
                     <h4>添加新文书</h4>
                 </div>
                 <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" id="documentForm" 
-                          class="form-container">
+                    <form method="POST" enctype="multipart/form-data" id="documentForm" class="form-container">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <!-- 在文书图片上传之前添加册号输入 -->
+                        
+                        <!-- 册号输入 -->
                         <div class="mb-3">
                             <label for="doc_id" class="form-label">文书册号</label>
                             <div class="input-group">
@@ -101,35 +116,45 @@
                                    name="document_image" accept="image/*" required>
                         </div>
                         
-                        <!-- 图片预览区域 -->
+                        <!-- 图片预览 -->
                         <div id="imagePreview" class="mb-3">
                             <img src="" alt="预览图片" class="preview-image">
                         </div>
                         
-                        <!-- 文书文本输入 -->
+                        <!-- 文书文本 -->
                         <div class="mb-3">
                             <label for="document_text" class="form-label">文书文本</label>
                             <textarea class="form-control" id="document_text" name="document_text" 
                                       rows="10" required></textarea>
                         </div>
                         
-                        <!-- 提交按钮 -->
+                        <!-- 按钮组 -->
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary" id="submitBtn">
-                                <i class="fas fa-plus"></i> 添加文书
-                            </button>
-                            <a href="{{ url_for('user.manage_documents') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> 返回
-                            </a>
+                            <div class="btn-group" role="group">
+                                <button type="submit" class="btn btn-primary" id="submitBtn">
+                                    <i class="fas fa-save"></i> 直接保存
+                                </button>
+                                <button type="button" class="btn btn-info" id="cacheBtn">
+                                    <i class="fas fa-plus"></i> 保存到暂存区
+                                </button>
+                                <a href="{{ url_for('user.cached_documents') }}" class="btn btn-warning">
+                                    <i class="fas fa-list"></i> 查看暂存区
+                                </a>
+                            </div>
                         </div>
                     </form>
+
+                    <!-- 暂存区状态显示 -->
+                    <div id="cacheStatus" class="alert alert-info mt-3" style="display: none;">
+                        <h5 class="mb-0">暂存区文书数量: <span id="cachedCount">0</span></h5>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 加载中遮罩 -->
+<!-- 加载遮罩 -->
 <div class="loading-overlay" id="loadingOverlay">
     <div class="loading-content">
         <div class="spinner-border text-light mb-3" role="status">
@@ -143,7 +168,7 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-// 图片预览功能
+// 图片预览
 document.getElementById('document_image').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (file) {
@@ -157,170 +182,238 @@ document.getElementById('document_image').addEventListener('change', function(e)
     }
 });
 
-// 表单提交处理
+// 检查册号
+async function checkDocId() {
+    const docId = document.getElementById('doc_id').value;
+    const docIdInput = document.getElementById('doc_id');
+    const feedback = document.getElementById('docIdFeedback');
+    
+    if (!docId.match(/^\d+-\d+-\d+-\d+$/)) {
+        docIdInput.classList.add('is-invalid');
+        feedback.textContent = '册号格式不正确，请使用 x-x-x-x 格式';
+        return false;
+    }
+    
+    try {
+        const response = await fetch('/user/check_doc_id', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: JSON.stringify({doc_id: docId})
+        });
+        
+        const data = await response.json();
+        
+        if (data.exists) {
+            docIdInput.classList.add('is-invalid');
+            feedback.textContent = '该册号已存在';
+            return false;
+        } else {
+            docIdInput.classList.remove('is-invalid');
+            docIdInput.classList.add('is-valid');
+            feedback.textContent = '';
+            return true;
+        }
+    } catch (error) {
+        console.error('检查册号出错:', error);
+        docIdInput.classList.add('is-invalid');
+        feedback.textContent = '检查册号时出错，请重试';
+        return false;
+    }
+}
+
+// 直接保存表单处理
 document.getElementById('documentForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    // 先检查册号
     const isDocIdValid = await checkDocId();
     if (!isDocIdValid) {
         return;
     }
     
-    // 其他验证...
     const textArea = document.getElementById('document_text');
     const imageInput = document.getElementById('document_image');
     
     if (!textArea.value.trim()) {
-        alert('请输入文书文本');
+        Swal.fire({
+            title: '错误',
+            text: '请输入文书文本',
+            icon: 'error'
+        });
         return;
     }
     
     if (!imageInput.files || !imageInput.files[0]) {
-        alert('请选择文书图片');
+        Swal.fire({
+            title: '错误',
+            text: '请选择文书图片',
+            icon: 'error'
+        });
         return;
     }
     
-    // 显示加载遮罩
     document.getElementById('loadingOverlay').style.display = 'block';
     
     try {
-        // 创建 FormData 对象
         const formData = new FormData(this);
-        
-        // 发送请求
         const response = await fetch('/user/add_document', {
             method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
-            }
+            body: formData
         });
         
-        // 隐藏加载遮罩
         document.getElementById('loadingOverlay').style.display = 'none';
         
         if (response.ok) {
-            if (response.redirected) {
-                // 如果是重定向到管理页面，说明添加成功
-                Swal.fire({
-                    title: '成功！',
-                    text: '文书添加成功',
-                    icon: 'success',
-                    confirmButtonText: '确定'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.href = response.url;
-                    }
-                });
-            } else {
-                const data = await response.json();
-                if (data.error) {
-                    Swal.fire({
-                        title: '错误',
-                        text: data.error,
-                        icon: 'error',
-                        confirmButtonText: '确定'
-                    });
-                } else {
-                    window.location.reload();
-                }
-            }
+            await Swal.fire({
+                title: '成功！',
+                text: '文书添加成功',
+                icon: 'success',
+                confirmButtonText: '确定'
+            });
+            
+            // 强制刷新���重定向到文书管理页面
+            window.location.href = '{{ url_for("user.manage_documents") }}';
+            
         } else {
-            throw new Error('提交失败');
+            const errorData = await response.json();
+            throw new Error(errorData.message || '保存失败');
         }
     } catch (error) {
-        // 隐藏加载遮罩
         document.getElementById('loadingOverlay').style.display = 'none';
-        console.error('提交表单时出错:', error);
         Swal.fire({
             title: '错误',
-            text: '提交表单时出错，请重试',
-            icon: 'error',
-            confirmButtonText: '确定'
+            text: error.message || '保存文书时出错，请重试',
+            icon: 'error'
         });
     }
 });
 
-// 添加错误提示自动消失
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(function(alert) {
-            alert.style.display = 'none';
-        });
-    }, 5000); // 5秒后自动隐藏
-});
+// 保存到暂存区
+document.getElementById('cacheBtn').addEventListener('click', async function() {
+    try {
+        // 验证表单
+        const docId = document.getElementById('doc_id').value;
+        const docText = document.getElementById('document_text').value;
+        const imageFile = document.getElementById('document_image').files[0];
 
-// 关闭警告框
-document.querySelectorAll('.alert .btn-close').forEach(button => {
-    button.addEventListener('click', function() {
-        this.closest('.alert').remove();
-    });
-});
-
-// 检查册号函数
-function checkDocId() {
-    const docId = document.getElementById('doc_id').value;
-    const docIdInput = document.getElementById('doc_id');
-    const feedback = document.getElementById('docIdFeedback');
-    
-    // 验证格式
-    const pattern = /^\d+-\d+-\d+-\d+$/;
-    if (!pattern.test(docId)) {
-        docIdInput.classList.add('is-invalid');
-        feedback.textContent = '册号格式不正确，请使用 x-x-x-x 格式';
-        return Promise.resolve(false);
-    }
-    
-    return new Promise((resolve) => {
-        $.ajax({
-            url: '/user/check_doc_id',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({doc_id: docId}),
-            headers: {
-                'X-CSRFToken': $('input[name="csrf_token"]').val()
-            },
-            success: function(response) {
-                // 更新 CSRF token
-                if (response.csrf_token) {
-                    $('input[name="csrf_token"]').val(response.csrf_token);
-                }
-                
-                if (response.exists) {
-                    docIdInput.classList.add('is-invalid');
-                    feedback.textContent = '该册号已存在，请重新输入';
-                    resolve(false);
-                } else {
-                    docIdInput.classList.remove('is-invalid');
-                    docIdInput.classList.add('is-valid');
-                    feedback.textContent = '';
-                    resolve(true);
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error:', error);
-                docIdInput.classList.add('is-invalid');
-                feedback.textContent = '检查册号时出错，请重试';
-                resolve(false);
-            }
-        });
-    });
-}
-
-$(document).ready(function() {
-    // 获取 CSRF token
-    var csrfToken = $('input[name="csrf_token"]').val();
-    
-    // 添加到 AJAX 请求头
-    $.ajaxSetup({
-        beforeSend: function(xhr, settings) {
-            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
-                xhr.setRequestHeader("X-CSRFToken", csrfToken);
-            }
+        // 基本验证
+        if (!docId || !docText || !imageFile) {
+            Swal.fire({
+                title: '错误',
+                text: '请填写所有必要信息',
+                icon: 'error'
+            });
+            return;
         }
-    });
+
+        // 显示加载提示
+        document.getElementById('loadingOverlay').style.display = 'block';
+
+        // 读取图片为 base64
+        const reader = new FileReader();
+        reader.readAsDataURL(imageFile);
+        
+        reader.onload = async function() {
+            try {
+                // 获取现有缓存
+                let cachedDocs = [];
+                const existingCache = localStorage.getItem('cachedDocuments');
+                if (existingCache) {
+                    cachedDocs = JSON.parse(existingCache);
+                }
+
+                // 检查重复
+                if (cachedDocs.some(doc => doc.doc_id === docId)) {
+                    throw new Error('暂存区已存在相同册号的文书');
+                }
+
+                // 添加新文档
+                cachedDocs.push({
+                    doc_id: docId,
+                    text: docText,
+                    image: reader.result
+                });
+
+                // 保存到 localStorage
+                localStorage.setItem('cachedDocuments', JSON.stringify(cachedDocs));
+
+                // 更新显示
+                document.getElementById('cacheStatus').style.display = 'block';
+                document.getElementById('cachedCount').textContent = cachedDocs.length;
+
+                // 清空表单
+                document.getElementById('documentForm').reset();
+                document.getElementById('imagePreview').style.display = 'none';
+
+                // 隐藏加载提示
+                document.getElementById('loadingOverlay').style.display = 'none';
+
+                // 显示成功消息
+                await Swal.fire({
+                    title: '成功',
+                    text: '文书已添加到暂存区',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+
+            } catch (error) {
+                document.getElementById('loadingOverlay').style.display = 'none';
+                Swal.fire({
+                    title: '错误',
+                    text: error.message || '保存到暂存区失败，请重试',
+                    icon: 'error'
+                });
+            }
+        };
+
+        reader.onerror = function() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            Swal.fire({
+                title: '错误',
+                text: '图片处理失败，请重试',
+                icon: 'error'
+            });
+        };
+
+    } catch (error) {
+        document.getElementById('loadingOverlay').style.display = 'none';
+        Swal.fire({
+            title: '错误',
+            text: error.message || '保存到暂存区失败，请重试',
+            icon: 'error'
+        });
+    }
+});
+
+// 修改页面加载时的缓存显示代码
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const cachedDocuments = JSON.parse(localStorage.getItem('cachedDocuments') || '[]');
+        if (cachedDocuments.length > 0) {
+            // 更新缓存状态显示
+            document.getElementById('cacheStatus').style.display = 'block';
+            document.getElementById('cachedCount').textContent = cachedDocuments.length;
+            
+            // 显示提示消息
+            Swal.fire({
+                title: '提示',
+                text: `暂存区中有 ${cachedDocuments.length} 个未保存的文书`,
+                icon: 'info',
+                showConfirmButton: true
+            });
+        } else {
+            // 如果没有缓存的文档，隐藏状态显示
+            document.getElementById('cacheStatus').style.display = 'none';
+        }
+    } catch (e) {
+        console.error('读取缓存失败:', e);
+        // 发生错误时重置缓存
+        localStorage.removeItem('cachedDocuments');
+        document.getElementById('cacheStatus').style.display = 'none';
+    }
 });
 </script>
 {% endblock %} 
