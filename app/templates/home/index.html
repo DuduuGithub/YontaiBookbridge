@@ -7,10 +7,8 @@
     .hero-section {
         /* 使用纯色背景作为备选 */
         background-color: #2c3e50;
-        {% if url_for('static', filename='images/hero-bg.jpg') %}
         background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
-                    url("{{ url_for('static', filename='images/hero-bg.jpg') }}");
-        {% endif %}
+                    url("/static/images/hero-bg.jpg");
         background-size: cover;
         background-position: center;
         color: white;
@@ -71,7 +69,7 @@
         <h1 class="display-4 mb-4">永泰文书数字化平台</h1>
         <p class="lead mb-5">探索历史文献，发现知识价值</p>
         <a href="{{ url_for('searcher.index') }}" class="btn btn-primary btn-lg me-3">开始阅读</a>
-        <a href="{{ url_for('analysis.index') }}" class="btn btn-outline-light btn-lg">数据分析</a>
+        <a href="{{ url_for('analysis.index') }}" class="btn btn-primary btn-lg">数据分析</a>
     </div>
 </section>
 
@@ -83,7 +81,7 @@
             <a href="{{ url_for('analysis.index') }}" class="text-decoration-none text-dark">
                 <div class="card feature-card h-100">
                     <div class="card-body text-center">
-                        <i class="fas fa-chart-network feature-icon"></i>
+                        <i class="fas fa-chart-line feature-icon"></i>
                         <h3 class="card-title">数据分析</h3>
                         <p class="card-text">深入分析文书数据，展现历史人物关系网络。</p>
                     </div>
@@ -143,9 +141,9 @@
             <div class="col-md-4">
                 <div class="card literature-card">
                     <div class="card-body">
-                        <h5 class="card-title">《哈佛教授的永泰“三课”》</h5>
+                        <h5 class="card-title">《哈佛教授的永泰"三课"》</h5>
                         <p class="card-text text-muted">作者：蒋雅琛、叶欣童</p>
-                        <p class="card-text">数年时间，加拿大学者宋怡明关心平头百姓的家长里短，探寻普通家族的荣辱兴衰，带着学生来做调查，甚至放出话“要把下半辈子贡献给永泰民间文书研究”。他们在这里发现了什么？哪些是他们的兴趣所在？</p>
+                        <p class="card-text">数年时间，加拿大学者宋怡明关心平头百姓的家长里短，探寻普通家族的荣辱兴衰，带着学生来做调查，甚至放出话"要把下半辈子贡献给永泰民间文书研究"。他们在这里发现了什么？哪些是他们的兴趣所在？</p>
                         <a href="https://kns.cnki.net/kcms2/article/abstract?v=oGsGy-nFbJTYpLWp3TItoFPTP8SxHQGx0Td6BIrYmrIo4fW2Q--YiCv5rQPzpG4ma6Mbvks3t4eB6ou2u_geXBGBZ1fjwnJH8_aDl7S1JanksMHFv6TiOiCLGkn_eLYBefz3eD3_2xNhvuIOjvL4hZIfalDzTo-6PzJQ95RQ62ljyly9IT3uJR_r40zLaPFGlnoB_AY57I0=&uniplatform=NZKPT&language=CHS"
                          class="btn btn-outline-primary" target="_blank">
                             阅读论文
