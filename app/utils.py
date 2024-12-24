@@ -211,7 +211,7 @@ def db_context_query(query, doc_type=None, date_from=None, date_to=None):
         search_terms = query.split()
         formatted_query = ' '.join([f'+*{term}*' for term in search_terms])
         
-        # 构��基本的全文检索 SQL 查询
+        # 构建基本的全文检索 SQL 查询
         sql = """
             SELECT Doc_id FROM Documents
             WHERE MATCH(Doc_title, Doc_simplifiedText, Doc_originalText) 
@@ -277,67 +277,100 @@ from Database.model import *
 
 def process_document_text(original_text: str, image_path: str):
     """处理文书文本，返回所有需要的信息"""
-    # 预处理文本：删除所有空格和换行符
-    original_text = ''.join(original_text.split())  # 删除所有空白字符（包括空格、换行符、制表符等）
-    
-    # 1. 转换繁简体
-    simplified_text = convert_to_simplified(original_text)
-    
-    # 2. 调用大模型获取文书信息
-    doc_info = get_document_info(simplified_text)
-    
-    # 3. 转换创建时间格式
-    created_time = doc_info.get('created_time', '')
-    if created_time:
-        standard_time = convert_to_gregorian(created_time)
-        if standard_time != "未找到对应年号" and standard_time != "格式错误，请包含'年'字":
-            year, month, day = map(int, standard_time.split(':'))
-            if month == 0:
-                standard_time = f"{year}-01-01"  # 如果没有月份，默认为1月1日
-            elif day == 0:
-                standard_time = f"{year}-{month:02d}-01"  # 如果没有日期，默认为1日
-            else:
-                standard_time = f"{year}-{month:02d}-{day:02d}"
+    try:
+        # 预处理文本：删除所有空格和换行符
+        original_text = ''.join(original_text.split())  # 删除所有空白字符（包括空格、换行符、制表符等）
+        
+        # 1. 转换繁简体
+        simplified_text = convert_to_simplified(original_text)
+        print(f"简体化后的文本: {simplified_text}")
+        
+        # 2. 调用大模型获取文书信息
+        try:
+            doc_info = get_document_info(simplified_text)
+            print(f"大模型返回的文书信息: {json.dumps(doc_info, ensure_ascii=False, indent=2)}")
+        except Exception as e:
+            print(f"获取文书信息失败: {str(e)}")
+            raise ValueError(f"获取文书信息失败: {str(e)}")
+        
+        # 3. 转换创建时间格式
+        created_time = doc_info.get('created_time', '')
+        if created_time:
+            try:
+                standard_time = convert_to_gregorian(created_time)
+                print(f"转换创建时间: {created_time} -> {standard_time}")
+                if standard_time == "未找到对应年号":
+                    print(f"警告：未找到对应年号 {created_time}")
+                    standard_time = None
+                elif standard_time == "格式错误，请包含'年'字":
+                    print(f"警告：时间格式错误 {created_time}")
+                    standard_time = None
+                else:
+                    year, month, day = map(int, standard_time.split(':'))
+                    if month == 0:
+                        standard_time = f"{year}-01-01"  # 如果没有月份，默认为1月1日
+                    elif day == 0:
+                        standard_time = f"{year}-{month:02d}-01"  # 如果没有日期，默认为1日
+                    else:
+                        standard_time = f"{year}-{month:02d}-{day:02d}"
+            except Exception as e:
+                print(f"转换创建时间失败: {str(e)}")
+                standard_time = None
         else:
+            print("警告：文书信息中没有创建时间")
             standard_time = None
-    else:
-        standard_time = None
-    
-    # 4. 转换修改时间格式
-    updated_time = doc_info.get('updated_time')
-    if updated_time:
-        standard_updated_time = convert_to_gregorian(updated_time)
-        if standard_updated_time != "未找到对应年号" and standard_updated_time != "格式错误，请包含'年'字":
-            year, month, day = map(int, standard_updated_time.split(':'))
-            if month == 0:
-                standard_updated_time = f"{year}-01-01"
-            elif day == 0:
-                standard_updated_time = f"{year}-{month:02d}-01"
-            else:
-                standard_updated_time = f"{year}-{month:02d}-{day:02d}"
+        
+        # 4. 转换修改时间格式
+        updated_time = doc_info.get('updated_time')
+        if updated_time and updated_time != 'null':
+            try:
+                standard_updated_time = convert_to_gregorian(updated_time)
+                print(f"转换修改时间: {updated_time} -> {standard_updated_time}")
+                if standard_updated_time == "未找到对应年号":
+                    print(f"警告：未找到对应年号 {updated_time}")
+                    standard_updated_time = None
+                elif standard_updated_time == "格式错误，请包含'年'字":
+                    print(f"警告：时间格式错误 {updated_time}")
+                    standard_updated_time = None
+                else:
+                    year, month, day = map(int, standard_updated_time.split(':'))
+                    if month == 0:
+                        standard_updated_time = f"{year}-01-01"
+                    elif day == 0:
+                        standard_updated_time = f"{year}-{month:02d}-01"
+                    else:
+                        standard_updated_time = f"{year}-{month:02d}-{day:02d}"
+            except Exception as e:
+                print(f"转换修改时间失败: {str(e)}")
+                standard_updated_time = None
         else:
             standard_updated_time = None
-    else:
-        standard_updated_time = None
-    
-    # 5. 整理返回数据
-    return {
-        'doc_id': doc_info.get('doc_id', ''),
-        'original_text': original_text,  # 已经去除空格和换行符的原文
-        'simplified_text': doc_info['simple_text'],  # 断句且再次简体化的简体版本
-        'image_path': image_path,
-        'title': doc_info['title'],
-        'type': doc_info['type'],
-        'summary': doc_info['summary'],
-        'created_time': created_time,
-        'standard_time': standard_time,
-        'updated_time': updated_time,
-        'standard_updated_time': standard_updated_time,
-        'keywords': doc_info['keywords'],
-        'contractors': doc_info['contractors'],
-        'relation': doc_info.get('relation'),
-        'participants': doc_info['participants']
-    }
+        
+        # 5. 整理返回数据
+        result = {
+            'doc_id': doc_info.get('doc_id', ''),
+            'original_text': original_text,  # 已经去除空格和换行符的原文
+            'simplified_text': doc_info['simple_text'],  # 断句且再次简体化的简体版本
+            'image_path': image_path,
+            'title': doc_info['title'],
+            'type': doc_info['type'],
+            'summary': doc_info['summary'],
+            'created_time': created_time,
+            'standard_time': standard_time,
+            'updated_time': updated_time,
+            'standard_updated_time': standard_updated_time,
+            'keywords': doc_info['keywords'],
+            'contractors': doc_info['contractors'],
+            'relation': doc_info.get('relation'),
+            'participants': doc_info['participants']
+        }
+        
+        print(f"处理完成的文书数据: {json.dumps(result, ensure_ascii=False, indent=2)}")
+        return result
+        
+    except Exception as e:
+        print(f"处理文书文本失败: {str(e)}")
+        raise ValueError(f"处理文书文本失败: {str(e)}")
 
 def generate_doc_id():
     """生成文书ID"""
@@ -404,7 +437,7 @@ def get_document_info(text: str):
             "type": "文书类型",
             "summary": "文书大意",
             "created_time": "签订时间",
-            "updated_time": "更改时间（如果有则填写，没有则为null）",
+            "updated_time": "更��时间（如果有则填写，没有则为null）",
             "keywords": ["关键词1", "关键词2", "关键词3"],
             "contractors": [
                 {"name": "第一个契约人姓名"},
@@ -418,7 +451,7 @@ def get_document_info(text: str):
             "simple_text": "文书内容断句且简体化"
         }
 
-        请严格按照上述JSON格���返回结果。以下是文书内容：
+        请严格按照上述JSON格式返回结果。以下是文书内容：
         """
         
         # 创建消息
@@ -524,7 +557,7 @@ def db_one_filter_record(model, field, value):
 def db_advanced_search(title=None, person=None):
     """
     在 DocumentDisplayView 视图中进行精细搜索
-    使用正则表达式在《》内匹配人名
+    使用正则表达式���《》内匹配人名
     """
     try:
         query = text("""
@@ -561,7 +594,7 @@ class TestDocumentProcessing():
         # 测试用的文书文本
         self.test_text = """
         清道光十二年十二月黃興忠立撮字
-        立撮字黃興忠撮出錢壹仟貳百文正言約俟至癸巳年拾月中旬約紙照價里还不敢過期如是過��照例行息不敢久欠如是久欠保認代賠不負字照
+        立撮字黃興忠撮出錢壹仟貳百文正言約俟至癸巳年拾月中旬約紙照價里��不敢過期如是過��照例行息不敢久欠如是久欠保認代賠不負字照
         道光拾貳年拾二月日立撮字黃興忠
         保認侄長善
         代���兄文廉
@@ -595,7 +628,7 @@ class TestDocumentProcessing():
                     print(f"缺少必要的键: {key}")
                     return False
             
-            # 打印提取的信息
+            # 打印提取的信��
             print("\n提取文书信息:")
             for key, value in doc_info.items():
                 print(f"{key}: {value}")
