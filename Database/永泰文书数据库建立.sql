@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS Documents (
     INDEX idx_Doc_id (Doc_id),  -- 文书序号索引
     INDEX idx_Doc_type (Doc_type),  -- 文书类型索引
     INDEX idx_Doc_createdTime_id (Doc_createdTime_id),  -- 创建时间索引
-    INDEX idx_Doc_updatedTime_id (Doc_updatedTime_id),  -- 修改时间索引
+    INDEX idx_Doc_updatedTime_id (Doc_updatedTime_id)  -- 修改时间索引
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;  -- 设置字符集为 utf8mb4
 ALTER TABLE documents ADD FULLTEXT INDEX ft_doc_content (Doc_title,Doc_simplifiedText,Doc_originalText) WITH PARSER ngram;   -- 添加全文索引
 
@@ -231,3 +231,10 @@ CREATE TABLE IF NOT EXISTS FolderContents (
     INDEX idx_Folder_id (Folder_id),  -- 为 Folder_id 添加索引
     INDEX idx_Doc_id (Doc_id)  -- 为 Doc_id 添加索引
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 19、文书图片缓存表
+CREATE TABLE cached_documents (
+    doc_id VARCHAR(20) PRIMARY KEY,
+    doc_originalText TEXT NOT NULL,
+    image_path VARCHAR(255) DEFAULT NULL
+);

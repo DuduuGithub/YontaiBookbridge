@@ -293,6 +293,7 @@ document.getElementById('documentForm').addEventListener('submit', async functio
 // 保存到暂存区
 document.getElementById('cacheBtn').addEventListener('click', async function() {
     try {
+        const formData = new FormData();
         // 验证表单
         const docId = document.getElementById('doc_id').value;
         const docText = document.getElementById('document_text').value;
@@ -307,6 +308,18 @@ document.getElementById('cacheBtn').addEventListener('click', async function() {
             });
             return;
         }
+        
+        formData.append('doc_id', docId);
+        formData.append('doc_text', docText);
+        formData.append('document_image', imageFile); // 将图片文件添加到 FormData
+
+        const response = await fetch('/user/save_to_cache', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: formData
+        });
 
         // 显示加载提示
         document.getElementById('loadingOverlay').style.display = 'block';
@@ -317,38 +330,12 @@ document.getElementById('cacheBtn').addEventListener('click', async function() {
         
         reader.onload = async function() {
             try {
-                // 获取现有缓存
-                let cachedDocs = [];
-                const existingCache = localStorage.getItem('cachedDocuments');
-                if (existingCache) {
-                    cachedDocs = JSON.parse(existingCache);
-                }
-
-                // 检查重复
-                if (cachedDocs.some(doc => doc.doc_id === docId)) {
-                    throw new Error('暂存区已存在相同册号的文书');
-                }
-
-                // 添加新文档
-                cachedDocs.push({
-                    doc_id: docId,
-                    text: docText,
-                    image: reader.result
-                });
-
-                // 保存到 localStorage
-                localStorage.setItem('cachedDocuments', JSON.stringify(cachedDocs));
-
-                // 更新显示
-                document.getElementById('cacheStatus').style.display = 'block';
-                document.getElementById('cachedCount').textContent = cachedDocs.length;
+                // 这里只需要显示成功消息，不再保存到缓存
+                document.getElementById('loadingOverlay').style.display = 'none';
 
                 // 清空表单
                 document.getElementById('documentForm').reset();
                 document.getElementById('imagePreview').style.display = 'none';
-
-                // 隐藏加载提示
-                document.getElementById('loadingOverlay').style.display = 'none';
 
                 // 显示成功消息
                 await Swal.fire({
@@ -388,19 +375,20 @@ document.getElementById('cacheBtn').addEventListener('click', async function() {
     }
 });
 
-// 修改页面加载时的缓存显示代码
+// 修改页面加载时的动态提示代码
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        const cachedDocuments = JSON.parse(localStorage.getItem('cachedDocuments') || '[]');
-        if (cachedDocuments.length > 0) {
+        // 这里仍然显示提示消息，但不再从 localStorage 获取缓存数据
+        const cachedDocsCount = 0; // 当前不再从缓存获取，直接设置为 0 或其他需要的状态
+        if (cachedDocsCount > 0) {
             // 更新缓存状态显示
             document.getElementById('cacheStatus').style.display = 'block';
-            document.getElementById('cachedCount').textContent = cachedDocuments.length;
+            document.getElementById('cachedCount').textContent = cachedDocsCount;
             
             // 显示提示消息
             Swal.fire({
                 title: '提示',
-                text: `暂存区中有 ${cachedDocuments.length} 个未保存的文书`,
+                text: `暂存区中有 ${cachedDocsCount} 个未保存的文书`,
                 icon: 'info',
                 showConfirmButton: true
             });
@@ -410,10 +398,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     } catch (e) {
         console.error('读取缓存失败:', e);
-        // 发生错误时重置缓存
-        localStorage.removeItem('cachedDocuments');
         document.getElementById('cacheStatus').style.display = 'none';
     }
 });
+
 </script>
 {% endblock %} 

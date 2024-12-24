@@ -11,7 +11,7 @@ from utils import (
     process_document_text,  # 添加这个导入
     insert_document        # 添加这个导入
 )
-from Database.model import UserBrowsingHistory, Folders, Notes, Users, Documents, AuditLog, DocumentDisplayView, FolderContents, FolderDocumentStats
+from Database.model import UserBrowsingHistory, Folders, Notes, Users, Documents, AuditLog, DocumentDisplayView, FolderContents, FolderDocumentStats,CachedDocument
 from Database.config import db
 from datetime import datetime
 from sqlalchemy import func
@@ -400,6 +400,122 @@ def allowed_file(filename):
 class DocumentForm(FlaskForm):
     pass
 
+
+
+@user_bp.route('/save_to_cache', methods=['POST'])
+def save_to_cache():
+    try:
+        doc_id = request.form.get('doc_id')
+        doc_text = request.form.get('doc_text')
+        image_file = request.files.get('document_image')  # 获取图片文件
+
+        if not doc_id or not doc_text:
+            return jsonify({'success': False, 'message': '请填写所有必要信息'})
+        
+        if not image_file:
+            return jsonify({'success': False, 'message': '请上传图片'})
+
+        try:
+            # 根据册号生成新的文件名
+            file_ext = image_file.filename.rsplit('.', 1)[1].lower()
+            new_filename = f'doc_img_{doc_id}.{file_ext}'
+            
+            # 确保存储路径存在
+            upload_folder = os.path.join(current_app.static_folder, 'images', 'documents')
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            # 保存文件
+            file_path = os.path.join(upload_folder, new_filename)
+            image_file.save(file_path)
+            print(f"文件已保存到: {file_path}") # 调试信息
+            
+            # 使用相对路径
+            relative_path = os.path.join('images', 'documents', new_filename)
+        
+        except Exception as e:
+            print(f'保存文件失败: {str(e)}')
+            return jsonify({'message': f'保存文件失败: {str(e)}'}), 500
+                
+        # 存储到数据库
+        existing_doc = CachedDocument.query.filter_by(doc_id=doc_id).first()
+        if existing_doc:
+            return jsonify({'success': False, 'message': '暂存区已存在相同册号的文书'})
+
+        new_doc = CachedDocument(doc_id=doc_id, doc_originalText=doc_text, image_path=relative_path)
+        
+        db.session.add(new_doc)
+        db.session.commit()
+        print('文书已添加到暂存区')
+        return jsonify({'success': True, 'message': '文书已添加到暂存区'})
+
+    except Exception as e:
+        print(f'保存文书到暂存区时出错: {str(e)}')
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@user_bp.route('/cached_documents')
+@login_required
+def cached_documents():
+    # 从数据库中获取暂存区文书列表
+    cached_documents = db_query_all(CachedDocument)
+
+    # 将查询结果转换为字典格式
+    documents = [doc.to_dict() for doc in cached_documents]
+    
+    return render_template('user/cached_documents.html', cached_documents=documents)
+
+
+@user_bp.route('/remove_cached_document', methods=['POST'])
+def remove_cached_document():
+    doc_id = request.form.get('doc_id')
+    
+    print(f"########################################################################删除文书: {str(doc_id)}")  # 调试信息
+    document = CachedDocument.query.filter_by(doc_id=doc_id).first()  # 直接比较字符串
+
+    if document:
+        db.session.delete(document)
+        db.session.commit()
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'message': '文书不存在'})
+
+
+
+@user_bp.route('/clear_cache', methods=['POST'])
+def clear_cache():
+    try:
+        # 获取所有缓存文书
+        cached_documents = CachedDocument.query.all()
+
+        for doc in cached_documents:
+            if doc.image_path:
+                # 确保路径正确，使用static_folder并拼接图片存储目录
+                upload_folder = os.path.join(current_app.static_folder)
+                file_path = os.path.join(upload_folder, doc.image_path)
+                print(f"************************删除文件: {repr(file_path)}")  # 调试信息
+                
+                # 检查文件是否存在
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        print(f"图片已删除: {file_path}")
+                    except Exception as e:
+                        print(f"删除文件失败: {file_path}, 错误: {e}")
+                else:
+                    print(f"图片未找到: {file_path}")  # 如果文件不存在
+        
+        # 删除缓存文书记录
+        CachedDocument.query.delete()
+        db.session.commit()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()  # 回滚事务
+        print(f"Error: {str(e)}")  # Error log for debugging
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @user_bp.route('/add_document', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -619,7 +735,3 @@ def delete_document(doc_id):
             'error': str(e)
         }), 500
 
-@user_bp.route('/cached_documents')
-@login_required
-def cached_documents():
-    return render_template('user/cached_documents.html')
